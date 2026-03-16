@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { supabase } from "../services/supabaseClient";
 import { useNavigate, Link } from "react-router-dom";
-import "./Login.css";
+import "../styles/Login.css";
 import { FaEye, FaEyeSlash } from "react-icons/fa";
 import toast from "react-hot-toast";
 
@@ -20,6 +20,8 @@ function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [loginAttempts, setLoginAttempts] = useState(0);
 
+
+  /*Login Notifications when user forgot password*/
   const handleLogin = async (e) => {
     e.preventDefault();
 
@@ -46,9 +48,7 @@ function Login() {
 
       return;
     }
-
-    /* SUCCESS LOGIN NOTIFICATION */
-
+     /*Login sucess*/
     toast.success("Login successful! Redirecting...");
 
     const user = data.user;
@@ -73,7 +73,7 @@ function Login() {
 
     <div style={{ display: "flex", height: "100vh", width: "100vw" }}>
 
-      {/* LEFT SIDE IMAGE */}
+      {/* leftside part */}
 
       <div
         style={{
@@ -85,7 +85,7 @@ function Login() {
         }}
       />
 
-      {/* RIGHT LOGIN PANEL */}
+      {/* right side part */}
 
       <div
         style={{
@@ -98,7 +98,7 @@ function Login() {
         }}
       >
 
-        {/* LOGOS */}
+        {/* top logos */}
 
         <div style={{ textAlign: "center", marginBottom: "30px" }}>
           <img src={qclogo} width="100" />
@@ -121,7 +121,7 @@ function Login() {
 
         <form onSubmit={handleLogin}>
 
-          {/* USER ID */}
+          {/* textfields*/}
 
           <label>
             User ID <span style={{ color: "#FF0000" }}>*</span>
@@ -135,7 +135,7 @@ function Login() {
             required
           />
 
-          {/* EMAIL */}
+          { }
 
           <label style={{ marginTop: "25px" }}>
             Email <span style={{ color: "#FF0000" }}>*</span>
@@ -149,7 +149,7 @@ function Login() {
             required
           />
 
-          {/* PASSWORD */}
+          { }
 
           <label style={{ marginTop: "25px" }}>
             Password <span style={{ color: "#FF0000" }}>*</span>
@@ -181,7 +181,7 @@ function Login() {
 
           </div>
 
-          {/* LOGIN BUTTON */}
+          {/* login button*/}
 
           <button
             type="submit"
@@ -202,7 +202,7 @@ function Login() {
 
         </form>
 
-        {/* FORGOT PASSWORD */}
+        {/* forgot password */}
 
         <div style={{ textAlign: "center", marginTop: "15px" }}>
           <Link
@@ -232,6 +232,7 @@ function Login() {
   );
 }
 
+/* input fields */  
 const inputStyle = {
   width: "100%",
   padding: "12px",
