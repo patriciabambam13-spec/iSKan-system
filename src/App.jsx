@@ -7,7 +7,8 @@ import SKKagawadDashboard from "./pages/SKKagawadDashboard";
 import RegisterYouth from "./pages/RegisterYouth";
 import GenerationQR from "./pages/GenerationQR";
 import ScanQr from "./pages/ScanQr";
-import Programs from "./pages/Programs";
+import CreatePrograms from "./pages/CreatePrograms";
+import ManageYouth from "./pages/manageYouth";
 
 function App() {
   return (
@@ -20,7 +21,8 @@ function App() {
         <Route path="/register" element={<RegisterYouth />} />
         <Route path="/generate" element={<GenerationQR />} />
         <Route path="/scan" element={<ScanQr />} />
-        <Route path="/programs" element={<Programs />} />
+        <Route path="/programs" element={<CreatePrograms />} />
+        <Route path="/manage" element={<ManageYouth />} />
       </Routes>
     </BrowserRouter>
   );

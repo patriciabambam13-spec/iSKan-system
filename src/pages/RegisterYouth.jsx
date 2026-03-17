@@ -337,8 +337,18 @@ return(
         {errors.residency_status && <p className="error">{errors.residency_status}</p>}
     </div>
   </div>
-</div>
+      <label>
+      Years of Residency (Optional)
+      </label>
 
+      <input
+      type="number"
+      name="years_residency"
+      value={formData.years_residency}
+      onChange={handleChange}
+      placeholder="Enter years"
+      />
+</div>
 
 {/* section3 */}
 

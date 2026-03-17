@@ -1,0 +1,187 @@
+/* PAGE HEADER */
+
+.page-header{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    background:white;
+    padding:14px 20px;
+    border-bottom:1px solid #ddd;
+}
+
+.page-header-left{
+    display:flex;
+    align-items:center;
+    gap:12px;
+}
+
+.back-btn{
+    width:34px;
+    height:34px;
+    border:none;
+    border-radius:8px;
+    background:#f1f1f1;
+    cursor:pointer;
+    font-size:18px;
+}
+
+.header-text h2{
+    margin:0;
+    font-size:20px;
+}
+
+.header-text p{
+    margin:0;
+    font-size:13px;
+    color:#666;
+}
+
+/* REGISTER BUTTON */
+
+.register-btn{
+    background:#f2b705;
+    border:none;
+    padding:10px 16px;
+    border-radius:8px;
+    font-weight:600;
+    cursor:pointer;
+}
+
+/* FILTER CARD */
+
+.filter-card{
+    background:white;
+    padding:16px;
+    border-radius:10px;
+    margin-top:20px;
+    display:flex;
+    gap:12px;
+    align-items:center;
+    box-shadow:0 2px 6px rgba(0,0,0,0.05);
+}
+
+/* SEARCH */
+
+.search-box{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    background:#f6f3d1;
+    border:1px solid #d6a200;
+    border-radius:8px;
+    padding:8px 12px;
+    flex:2;
+}
+
+.search-box input{
+    border:none;
+    background:transparent;
+    outline:none;
+    width:100%;
+}
+
+/* FILTER DROPDOWNS */
+
+.filter-card select{
+    padding:8px 12px;
+    border-radius:8px;
+    border:1px solid #d6a200;
+    background:#f6f3d1;
+    height:38px;
+}
+
+/* RECORD INFO BAR */
+
+.record-bar{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin:14px 0;
+}
+
+.record-text{
+    font-size:13px;
+    color:#666;
+}
+
+.export-buttons{
+    display:flex;
+    gap:8px;
+}
+
+.export-buttons button{
+    background:white;
+    border:1px solid #d6a200;
+    padding:6px 12px;
+    border-radius:6px;
+    cursor:pointer;
+}
+
+/* TABLE */
+
+.youth-table{
+    width:100%;
+    border-collapse:collapse;
+    background:white;
+    border-radius:10px;
+    overflow:hidden;
+    box-shadow:0 2px 6px rgba(0,0,0,0.08);
+}
+
+.youth-table thead{
+    background:#e7e7e7;
+}
+
+.youth-table th{
+    padding:12px;
+    font-size:14px;
+    text-align:left;
+}
+
+.youth-table td{
+    padding:12px;
+    font-size:14px;
+}
+
+/* YELLOW ROW SEPARATORS */
+
+.youth-table tbody tr{
+    border-bottom:2px solid #f2b705;
+}
+
+/* ACTION ICONS */
+
+.actions{
+    display:flex;
+    gap:14px;
+}
+
+.actions svg{
+    cursor:pointer;
+    font-size:16px;
+}
+
+.view{color:#9a7c00;}
+.edit{color:#0f2d44;}
+.delete{color:#8b0000;}
+
+/* PAGINATION */
+
+.pagination{
+    display:flex;
+    justify-content:center;
+    gap:8px;
+    margin-top:18px;
+}
+
+.pagination button{
+    padding:6px 10px;
+    border-radius:6px;
+    border:1px solid #d6a200;
+    background:white;
+    cursor:pointer;
+}
+
+.pagination .active{
+    background:#f2b705;
+}
