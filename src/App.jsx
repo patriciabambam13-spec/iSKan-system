@@ -9,6 +9,7 @@ import GenerationQR from "./pages/GenerationQR";
 import ScanQr from "./pages/ScanQr";
 import CreatePrograms from "./pages/CreatePrograms";
 import ManageYouth from "./pages/manageYouth";
+import Settings from "./pages/Settings";
 
 function App() {
   return (
@@ -23,6 +24,7 @@ function App() {
         <Route path="/scan" element={<ScanQr />} />
         <Route path="/programs" element={<CreatePrograms />} />
         <Route path="/manage" element={<ManageYouth />} />
+        <Route path="/settings" element={<Settings />} />
       </Routes>
     </BrowserRouter>
   );

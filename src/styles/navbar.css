@@ -4,7 +4,7 @@
     align-items:center;
     justify-content:space-between;
     background:#032541;
-    padding:10px 80px 2px 50px;
+    padding:10px 80px 10px 50px;
     color:white;
 }
 
@@ -43,12 +43,13 @@
     background:#feffe9;
     border-radius:15px;
     padding:5px 18px;
-    width:700px;
+    width: 40%;
 }
 
 .nav-search input{
     border:none;
     outline:none;
+    background:#feffe9;
     width:100%;
     font-size:15px;
 }

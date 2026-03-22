@@ -1,0 +1,145 @@
+/* Base page styling */
+.settings-page {
+  background-color: #fbf9f4; /* Off-white/beige background matching the image */
+  min-height: calc(100vh - 60px); /* Adjust based on your navbar height */
+  padding-bottom: 40px;
+  font-family: Arial, sans-serif;
+}
+
+/* Header Styling */
+.settings-header {
+  background-color: #ffffff;
+  padding: 20px 40px;
+  display: flex;
+  align-items: flex-start;
+  gap: 15px;
+  border-bottom: 2px solid #e0dfd9;
+  margin-bottom: 30px;
+}
+
+.back-button {
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  padding: 0;
+  margin-top: 5px;
+  color: #333;
+}
+
+.header-titles h1 {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 700;
+  color: #000;
+}
+
+.header-titles p {
+  margin: 5px 0 0 0;
+  font-size: 14px;
+  color: #666;
+}
+
+/* Layout Container */
+.settings-container {
+  display: flex;
+  max-width: 1200px;
+  margin: 0 auto;
+  gap: 25px;
+  padding: 0 40px;
+}
+
+/* Left Sidebar Navigation */
+.settings-sidebar {
+  flex: 0 0 250px;
+  background-color: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+  padding: 30px 0;
+  height: fit-content;
+}
+
+.settings-sidebar ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.settings-sidebar li {
+  padding: 15px 30px;
+  font-size: 16px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: #333;
+  font-weight: 500;
+}
+
+.settings-sidebar li:hover {
+  background-color: #f5f5f5;
+}
+
+.settings-sidebar li.active {
+  font-weight: 700;
+  color: #000;
+}
+
+/* Right Content Area */
+.settings-content {
+  flex: 1;
+  background-color: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+  padding: 40px;
+}
+
+.tab-pane h2 {
+  margin-top: 0;
+  margin-bottom: 25px;
+  font-size: 20px;
+  color: #000;
+}
+
+/* Map Embed */
+.map-container {
+  margin-bottom: 30px;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+/* Contact Info Section */
+.contact-info {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding-left: 10px;
+}
+
+.info-row {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.info-icon {
+  width: 24px;
+  height: 24px;
+  color: #000;
+  flex-shrink: 0;
+}
+
+.info-row span {
+  font-size: 16px;
+  color: #111;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .settings-container {
+    flex-direction: column;
+  }
+  
+  .settings-sidebar {
+    flex: auto;
+  }
+}

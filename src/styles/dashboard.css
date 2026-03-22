@@ -39,6 +39,18 @@
     color:#777;
 }
 
+.stat-icon-placeholder {
+  display: block;
+  width: 48px;
+  height: 48px;
+  /* The light yellow background frame from the mockup */
+  background-color: #fef0c7; 
+  border-radius: 8px;
+  margin-bottom: 16px;
+  /* Padding keeps the eventual inner image from touching the edges */
+  padding: 10px; 
+  object-fit: contain;
+}
 
 /* QUICK ACTIONS */
 
@@ -55,21 +67,36 @@
     margin-bottom:25px;
 }
 
-.action-btn{
-    background:white;
-    border:none;
-    border-radius:10px;
-    padding:12px;
-    font-weight:600;
-    cursor:pointer;
-    box-shadow:0 3px 6px rgba(0,0,0,0.08);
-    transition:0.2s;
+.actions-grid button {
+  background-color: #ffffff;
+  color: #111827;
+  border: 1px solid #e5e7eb; 
+  border-radius: 8px;
+  padding: 16px;
+  font-weight: 600;
+  font-size: 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  cursor: pointer;
+  
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px; /* Space between the icon and the text */
+  transition: all 0.2s ease-in-out;
 }
 
-.action-btn:hover{
-    background:#f8f8f8;
+.actions-grid button:hover {
+  background-color: #f9fafb;
+  border-color: #d1d5db;
 }
 
+.action-icon-placeholder {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+  /* Optional background just so you can see the placeholder boundaries */
+  background-color: transparent; 
+}
 
 /* MIDDLE SECTION */
 

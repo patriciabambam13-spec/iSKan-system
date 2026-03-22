@@ -1,6 +1,16 @@
 import { useEffect, useState } from "react";
 import Navbar from "../components/Navbar";
 import { supabase } from "../services/supabaseClient";
+import icon_youth from "../assets/totalyouth_ca.png";
+import icon_programs from "../assets/activeprograms_ca.png";
+import icon_transactions from "../assets/transactions_ca.png";
+import icon_overrides from "../assets/overrides_ca.png";
+import icon_benefeciaries from "../assets/beneficiaries_ca.png";
+import icon_addyouth from "../assets/addyouth_qa.png";
+import icon_createprogram from "../assets/create_qa.png";
+import icon_manageyouth from "../assets/manageyouth_qa.png";
+import icon_report from "../assets/report_qa.png";
+import icon_audit from "../assets/audit_qa.png";
 import "../styles/dashboard.css";
 
 export default function SKChairmanDashboard() {
@@ -53,26 +63,31 @@ export default function SKChairmanDashboard() {
         <div className="stats-grid">
 
           <div className="stat-card">
+            <img src={icon_youth} alt="Youth Icon" className="stat-icon-placeholder" />
             <h2>{stats.youth}</h2>
             <p>Total Registered Youth</p>
           </div>
 
           <div className="stat-card">
+            <img src={icon_programs} alt="Programs Icon" className="stat-icon-placeholder" />
             <h2>{stats.programs}</h2>
             <p>Active Programs</p>
           </div>
 
           <div className="stat-card">
+            <img src={icon_transactions} alt="Transactions Icon" className="stat-icon-placeholder" />
             <h2>{stats.transactions}</h2>
             <p>Transactions Today</p>
           </div>
 
           <div className="stat-card">
+            <img src={icon_overrides} alt="Overrides Icon" className="stat-icon-placeholder" />
             <h2>{stats.overrides}</h2>
             <p>Overrides Today</p>
           </div>
 
           <div className="stat-card">
+            <img src={icon_benefeciaries} alt="Beneficiaries Icon" className="stat-icon-placeholder" />
             <h2>{stats.beneficiaries}</h2>
             <p>Beneficiaries This Month</p>
           </div>
@@ -84,11 +99,26 @@ export default function SKChairmanDashboard() {
         <h3>Quick Actions</h3>
 
         <div className="actions-grid">
-          <button>Add Youth</button>
-          <button>Create Program</button>
-          <button>Manage Youth</button>
-          <button>Generate Reports</button>
-          <button>View Audit Logs</button>
+          <button>
+            <img src={icon_addyouth} alt="Add Youth Icon" className="action-icon-placeholder" />
+            Add Youth
+          </button>
+          <button>
+            <img src={icon_createprogram} alt="Create Program Icon" className="action-icon-placeholder" />
+            Create Program
+          </button>
+          <button>
+            <img src={icon_manageyouth} alt="Manage Youth Icon" className="action-icon-placeholder" />
+            Manage Youth
+          </button>
+          <button>
+            <img src={icon_report} alt="Generate Reports Icon" className="action-icon-placeholder" />
+            Generate Reports
+          </button>
+          <button>
+            <img src={icon_audit} alt="Audit Logs Icon" className="action-icon-placeholder" />
+            View Audit Logs
+          </button>
         </div>
 
         {/* FOOTER */}
