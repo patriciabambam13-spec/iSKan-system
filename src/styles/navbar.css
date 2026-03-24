@@ -110,18 +110,128 @@
     opacity:0.8;
 }
 
-
 /* logout button */
 .logout-btn{
     background:#092033;
     border:none;
     color:white;
-    padding:7px 10px;
-    border-radius:6px;
+    height: 40px;
+    width: 40px;
+    padding: 10px 10px;
+    border-radius: 6px;
     cursor:pointer;
-    font-size:18px;
+    font-size: 20px;
 }
 
 .logout-btn:hover{
     background:#051521;
+}
+
+.nav-btn{
+    background: transparent;
+    border:none;
+    color: none;
+    height: 40px;
+    width: 40px;
+    padding: 10px 10px;
+    border-radius: 6px;
+    cursor:pointer;
+    font-size: 20px;
+}
+
+
+/*NOTIFICATION DRAWER*/
+
+.drawer-overlay {/*darkens Foreground of webpage*/
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 998;
+}
+/* Sliding Drawer */
+.notification-drawer {
+    position: fixed;
+    top: 0;
+    right: -350px;
+    width: 350px;
+    height: 100vh;
+    background-color: #ffffff;
+    color: #ffffff;
+    box-shadow: -5px 0 15px rgba(0, 0, 0, 0.3);
+    z-index: 999; /* Topmost element */
+    transition: right 0.3s ease-in-out; /* smooth slide animation */
+    display: flex;
+    flex-direction: column;
+}
+
+/* Slide in when 'open' class is applied via React state */
+.notification-drawer.open {
+    right: 0;
+}
+
+/* --- Drawer Header --- */
+.drawer-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px;
+    background-color: #032541; /* Matches your navbar */
+    color: white;
+}
+
+.drawer-header h3 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+    color: #f7f7f7;
+}
+
+.close-button {
+    background: none;
+    border: none;
+    color: #f7f7f7;
+    font-size: 20px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.2s;
+}
+
+.close-button:hover {
+    color: #ffdf81; /* Matches your user-avatar yellow on hover */
+}
+
+/* --- Drawer Content & Notifications --- */
+.drawer-content {
+    padding: 20px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    background-color: #f4f7f6; /* Subtle off-white background */
+    flex-grow: 1; 
+}
+
+.notification-card {
+    background-color: #ffffff;
+    padding: 15px;
+    border-left: 4px solid #ffdf81; /* Yellow accent line */
+    border-radius: 6px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.notification-card p {
+    margin: 0 0 8px 0;
+    font-size: 14px;
+    color: #333;
+    line-height: 1.4;
+}
+
+.time-stamp {
+    font-size: 11px;
+    color: #777;
 }
