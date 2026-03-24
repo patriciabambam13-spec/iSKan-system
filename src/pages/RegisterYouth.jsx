@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import { supabase } from "../services/supabaseClient";
 import { QRCodeCanvas } from "qrcode.react";
@@ -30,8 +31,8 @@ export default function RegisterYouth() {
     const [errors,setErrors] = useState({});
     const [showQR,setShowQR] = useState(false);
     const [qrCode,setQrCode] = useState("");
-
-
+    const navigate = useNavigate();
+  
 //functions
   function handleChange(e){
 
@@ -233,7 +234,7 @@ return(
 
 <> 
     <Navbar/>
-
+    {/*}
     <div className="page-header">
 
       <button className="back-btn" onClick={()=>window.history.back()}>
@@ -245,6 +246,19 @@ return(
       <p>Register a new youth and generate QR ID</p>
       </div>
 
+    </div>*/}
+
+    {/* SEPARATED PAGE HEADER */}
+    <div className="page-header-wrapper">
+      <div className="page-header">
+          <div className="page-header-left">
+              <button className="back-btn" aria-label="Go back" onClick={() => navigate(-1)}>←</button>
+              <div className="header-text">
+                <h2>Add Youth</h2>
+                <p>Register a new youth and generate QR ID</p>
+              </div>
+          </div>
+      </div>
     </div>
 
   <form onSubmit={handleSubmit} className="register-form">

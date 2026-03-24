@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { Link, useNavigate } from 'react-router-dom';
 import Navbar from "../components/Navbar";
 import { supabase } from "../services/supabaseClient";
 import "../styles/manageYouth.css";
@@ -18,6 +19,11 @@ export default function ManageYouth() {
   const [showView, setShowView] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
   const [showDelete, setShowDelete] = useState(false);
+
+  const navigate = useNavigate();
+  const handleClick = (routePath) => {
+    navigate(routePath); // Navigate to the specified route path
+  }; 
 
   // FETCH YOUTH
   const fetchYouth = async () => {
@@ -92,7 +98,7 @@ export default function ManageYouth() {
       <div className="page-header-wrapper">
         <div className="page-header">
           <div className="page-header-left">
-            <button className="back-btn" aria-label="Go back">←</button>
+            <button className="back-btn" aria-label="Go back" onClick={() => navigate(-1)}>←</button>
             <div className="header-text">
               <h2>Manage Youth</h2>
               <p>View, edit, and manage registered youth records</p>

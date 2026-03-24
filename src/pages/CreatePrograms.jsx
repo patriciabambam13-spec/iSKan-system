@@ -218,11 +218,10 @@ export default function CreateProgram() {
 
             {/* Page Header */}
 
-            <div className="page-header">
-
+            {/*<div className="page-header">
                 <button
                     className="back-btn"
-                    onClick={() => navigate("/dashboard")}
+                    onClick={() => navigate(-1)}
                 >
                     <FaArrowLeft />
                 </button>
@@ -231,7 +230,19 @@ export default function CreateProgram() {
                     <h2>Create Program</h2>
                     <p>Set up a new SK program with rules and eligibility.</p>
                 </div>
+            </div>*/}
 
+            {/* SEPARATED PAGE HEADER */}
+            <div className="page-header-wrapper">
+                <div className="page-header">
+                    <div className="page-header-left">
+                        <button className="back-btn" aria-label="Go back" onClick={() => navigate(-1)}>←</button>
+                        <div className="header-text">
+                          <h2>Create Program</h2>
+                          <p>Set up a new SK program with rules and eligibility.</p>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             {/* Forms */}
