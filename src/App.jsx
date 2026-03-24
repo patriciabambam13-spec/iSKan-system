@@ -19,11 +19,11 @@ function App() {
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/chairman-dashboard" element={<SKChairmanDashboard />} />
         <Route path="/kagawad-dashboard" element={<SKKagawadDashboard />} />
-        <Route path="/register" element={<RegisterYouth />} />
-        <Route path="/generate" element={<GenerationQR />} />
+        <Route path="/register-youth" element={<RegisterYouth />} />
+        <Route path="/generate-reports" element={<GenerationQR />} />
         <Route path="/scan" element={<ScanQr />} />
-        <Route path="/programs" element={<CreatePrograms />} />
-        <Route path="/manageYouth" element={<ManageYouth />} />
+        <Route path="/create-programs" element={<CreatePrograms />} />
+        <Route path="/manage-youth" element={<ManageYouth />} />
         <Route path="/settings" element={<Settings />} />
       </Routes>
     </BrowserRouter>
