@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import Navbar from "../components/Navbar";
 import { supabase } from "../services/supabaseClient";
+import { Link, useNavigate } from 'react-router-dom';
 import icon_youth from "../assets/totalyouth_ca.png";
 import icon_programs from "../assets/activeprograms_ca.png";
 import icon_transactions from "../assets/transactions_ca.png";
@@ -14,6 +15,12 @@ import icon_audit from "../assets/audit_qa.png";
 import "../styles/dashboard.css";
 
 export default function SKChairmanDashboard() {
+
+  const navigate = useNavigate(); 
+
+  const handleClick = (routePath) => {
+    navigate(routePath); // Navigate to the specified route path
+  };
 
   const [stats, setStats] = useState({
     youth: 0,
@@ -99,23 +106,23 @@ export default function SKChairmanDashboard() {
         <h3>Quick Actions</h3>
 
         <div className="actions-grid">
-          <button>
-            <img src={icon_addyouth} alt="Add Youth Icon" className="action-icon-placeholder" />
-            Add Youth
+          <button  onClick={() => handleClick('/register-youth')}>
+            <img src={icon_addyouth} alt="Register Youth Icon" className="action-icon-placeholder" />
+            Register Youth
           </button>
-          <button>
+          <button onClick={() => handleClick('/create-program')}>
             <img src={icon_createprogram} alt="Create Program Icon" className="action-icon-placeholder" />
             Create Program
           </button>
-          <button>
+          <button onClick={() => handleClick('/manage-youth')}>
             <img src={icon_manageyouth} alt="Manage Youth Icon" className="action-icon-placeholder" />
-            Manage Youth
-          </button>
-          <button>
+              Manage Youth
+          </button>  
+          <button onClick={() => handleClick('/generate-reports')}>
             <img src={icon_report} alt="Generate Reports Icon" className="action-icon-placeholder" />
             Generate Reports
           </button>
-          <button>
+          <button  onClick={() => handleClick('')}>
             <img src={icon_audit} alt="Audit Logs Icon" className="action-icon-placeholder" />
             View Audit Logs
           </button>

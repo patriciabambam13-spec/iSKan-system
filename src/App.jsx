@@ -23,7 +23,7 @@ function App() {
         <Route path="/generate" element={<GenerationQR />} />
         <Route path="/scan" element={<ScanQr />} />
         <Route path="/programs" element={<CreatePrograms />} />
-        <Route path="/manage" element={<ManageYouth />} />
+        <Route path="/manageYouth" element={<ManageYouth />} />
         <Route path="/settings" element={<Settings />} />
       </Routes>
     </BrowserRouter>

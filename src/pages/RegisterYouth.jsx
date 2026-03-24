@@ -129,7 +129,7 @@ export default function RegisterYouth() {
 
     }
 
-//QR generation - not yet useful/functional
+//QR generation - not yet useful/functional for database
   async function handleSubmit(e){
 
       e.preventDefault();
