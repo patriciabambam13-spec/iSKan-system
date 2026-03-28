@@ -20,9 +20,15 @@ function App() {
         <Route path="/chairman-dashboard" element={<SKChairmanDashboard />} />
         <Route path="/kagawad-dashboard" element={<SKKagawadDashboard />} />
         <Route path="/register-youth" element={<RegisterYouth />} />
+<<<<<<< Updated upstream
         <Route path="/generate-reports" element={<GenerationQR />} />
         <Route path="/scan" element={<ScanQr />} />
         <Route path="/create-programs" element={<CreatePrograms />} />
+=======
+        <Route path="/generate" element={<GenerationQR />} />
+        <Route path="/scan" element={<ScanQr />} />
+        <Route path="/create-program" element={<CreatePrograms />} />
+>>>>>>> Stashed changes
         <Route path="/manage-youth" element={<ManageYouth />} />
         <Route path="/settings" element={<Settings />} />
       </Routes>
