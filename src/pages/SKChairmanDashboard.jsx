@@ -48,7 +48,7 @@ export default function SKChairmanDashboard() {
           programs: programCount || 0,
           transactions: 35,
           overrides: 5,
-          beneficiaries: 150
+          beneficiaries: 190
         });
 
       } catch (error) {

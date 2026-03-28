@@ -232,14 +232,4 @@ function Login() {
   );
 }
 
-/* input fields */  
-const inputStyle = {
-  width: "100%",
-  padding: "12px",
-  marginTop: "6px",
-  borderRadius: "6px",
-  border: "1px solid #832200",
-  backgroundColor: "#FDFFCA"
-};
-
 export default Login;
