@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import { supabase } from "../services/supabaseClient";
 import {
@@ -6,19 +7,19 @@ import {
   PieChart, Pie, Cell, Legend
 } from "recharts";
 import { format } from "date-fns";
-import { FaFileCsv, FaCalendarAlt, FaChartBar, FaChartPie } from "react-icons/fa";
+import { FaFileCsv, FaCalendarAlt, FaChartBar, FaChartPie, FaFilter, FaUsers, FaCheckCircle, FaCalendarCheck, FaChartLine } from "react-icons/fa";
 import "../styles/generateReports.css";
 
-const COLORS = ["#3B82F6", "#EC4899", "#F59E0B", "#10B981", "#8B5CF6"];
+const CHART_COLORS = ["#3B82F6", "#EC4899", "#F59E0B", "#10B981", "#8B5CF6"];
 
 export default function GenerateReports() {
+  const navigate = useNavigate();
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [program, setProgram] = useState("");
   const [reportType, setReportType] = useState("summary");
   const [isLoading, setIsLoading] = useState(false);
 
-  const [youths, setYouths] = useState([]);
   const [programs, setPrograms] = useState([]);
   const [filteredYouths, setFilteredYouths] = useState([]);
 
@@ -36,7 +37,6 @@ export default function GenerateReports() {
   const [genderData, setGenderData] = useState([]);
   const [programData, setProgramData] = useState([]);
 
-  // Fetch programs
   const fetchPrograms = async () => {
     try {
       const { data, error } = await supabase
@@ -50,7 +50,6 @@ export default function GenerateReports() {
     }
   };
 
-  // Fetch youth data
   const fetchReports = async () => {
     setIsLoading(true);
     try {
@@ -61,24 +60,18 @@ export default function GenerateReports() {
       }
 
       const { data, error } = await query;
-
       if (error) throw error;
 
       const youthData = data || [];
-      setYouths(youthData);
       
-      // Filter by program if selected
       let filtered = youthData;
       if (program) {
-        // You might need to adjust this based on your actual data structure
-        // This assumes you have a program_id field in youth table
         filtered = youthData.filter(y => y.program_id === program);
       }
       setFilteredYouths(filtered);
 
-      // Calculate Stats
       const total = filtered.length;
-      const active = filtered.filter(y => y.status === "active" || !y.status).length;
+      const active = filtered.filter(y => y.status === "Active" || !y.status).length;
       const male = filtered.filter(y => y.gender === "Male").length;
       const female = filtered.filter(y => y.gender === "Female").length;
       const other = filtered.filter(y => y.gender === "Other" || (y.gender !== "Male" && y.gender !== "Female")).length;
@@ -93,10 +86,9 @@ export default function GenerateReports() {
         other
       });
 
-      // Monthly Participation
       const months = {};
       filtered.forEach(y => {
-        const month = format(new Date(y.created_at || y.birthdate || Date.now()), "MMM");
+        const month = format(new Date(y.created_at || Date.now()), "MMM");
         months[month] = (months[month] || 0) + 1;
       });
 
@@ -110,7 +102,6 @@ export default function GenerateReports() {
 
       setMonthlyData(monthlyArray);
 
-      // Gender Distribution
       const genderArray = [
         { name: "Male", value: male },
         { name: "Female", value: female },
@@ -119,7 +110,6 @@ export default function GenerateReports() {
 
       setGenderData(genderArray);
 
-      // Program Participation (if you have program data)
       const programStats = {};
       filtered.forEach(y => {
         if (y.program_id) {
@@ -128,7 +118,7 @@ export default function GenerateReports() {
       });
 
       const programArray = Object.keys(programStats).map(pid => ({
-        name: programs.find(p => p.id === pid)?.name || "Unknown",
+        name: programs.find(p => p.id === pid)?.program_name || "Unknown",
         value: programStats[pid]
       }));
 
@@ -149,7 +139,6 @@ export default function GenerateReports() {
     fetchReports();
   }, [fromDate, toDate, program]);
 
-  // Export CSV
   const exportCSV = () => {
     const headers = ["Name", "Gender", "Age", "Contact", "Email", "Status", "Registration Date"];
     const rows = filteredYouths.map(y => [
@@ -178,7 +167,6 @@ export default function GenerateReports() {
     URL.revokeObjectURL(url);
   };
 
-  // Clear filters
   const clearFilters = () => {
     setFromDate("");
     setToDate("");
@@ -189,42 +177,47 @@ export default function GenerateReports() {
   return (
     <>
       <Navbar />
-      <div className="reports-page">
-        <div className="reports-header">
-          <h2>Generate Reports</h2>
-          <p>View and export youth participation analytics</p>
+      <div className="reports-container">
+        {/* Header Section */}
+        <div className="page-header">
+          <button className="back-btn" onClick={() => navigate(-1)} aria-label="Go back">
+            ←
+          </button>
+          <div className="header-text">
+            <h2>Generate Reports</h2>
+            <p>View and export youth participation analytics</p>
+          </div>
         </div>
 
-        {/* Filters Section */}
-        <div className="filters-section">
-          <div className="filters-grid">
-            <div className="filter-group">
+        {/* Filters Section - Simplified Single Row */}
+        <div className="filter-section">
+          <div className="filter-header">
+            <FaFilter className="filter-icon" />
+            <span>Filter Criteria</span>
+          </div>
+          
+          <div className="filters-wrapper">
+            <div className="filter-item">
               <label>From Date</label>
-              <div className="date-input-wrapper">
-                <FaCalendarAlt className="date-icon" />
-                <input
-                  type="date"
-                  value={fromDate}
-                  onChange={e => setFromDate(e.target.value)}
-                  className="filter-input"
-                />
-              </div>
+              <input
+                type="date"
+                value={fromDate}
+                onChange={e => setFromDate(e.target.value)}
+                className="filter-input"
+              />
             </div>
 
-            <div className="filter-group">
+            <div className="filter-item">
               <label>To Date</label>
-              <div className="date-input-wrapper">
-                <FaCalendarAlt className="date-icon" />
-                <input
-                  type="date"
-                  value={toDate}
-                  onChange={e => setToDate(e.target.value)}
-                  className="filter-input"
-                />
-              </div>
+              <input
+                type="date"
+                value={toDate}
+                onChange={e => setToDate(e.target.value)}
+                className="filter-input"
+              />
             </div>
 
-            <div className="filter-group">
+            <div className="filter-item">
               <label>Program</label>
               <select 
                 onChange={e => setProgram(e.target.value)} 
@@ -233,12 +226,12 @@ export default function GenerateReports() {
               >
                 <option value="">All Programs</option>
                 {programs.map(p => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
+                  <option key={p.id} value={p.id}>{p.program_name}</option>
                 ))}
               </select>
             </div>
 
-            <div className="filter-group">
+            <div className="filter-item">
               <label>Report Type</label>
               <select 
                 onChange={e => setReportType(e.target.value)}
@@ -249,29 +242,34 @@ export default function GenerateReports() {
                 <option value="detailed">Detailed Report</option>
               </select>
             </div>
-          </div>
 
-          <div className="filter-actions">
-            <button onClick={clearFilters} className="clear-btn">
-              Clear Filters
-            </button>
-            <button onClick={exportCSV} className="export-btn">
-              <FaFileCsv /> Export CSV
-            </button>
+            <div className="filter-item filter-buttons">
+              <label>&nbsp;</label>
+              <div className="button-group">
+                <button onClick={clearFilters} className="btn-outline">
+                  Clear Filters
+                </button>
+                <button onClick={exportCSV} className="btn-primary">
+                  <FaFileCsv /> Export CSV
+                </button>
+              </div>
+            </div>
           </div>
         </div>
 
         {isLoading ? (
-          <div className="loading-container">
+          <div className="loading-state">
             <div className="spinner"></div>
             <p>Loading reports...</p>
           </div>
         ) : (
           <>
-            {/* Stats Cards */}
+            {/* Statistics Cards */}
             <div className="stats-grid">
               <div className="stat-card">
-                <div className="stat-icon blue">👥</div>
+                <div className="stat-icon">
+                  <FaUsers />
+                </div>
                 <div className="stat-info">
                   <h3>{stats.total}</h3>
                   <p>Total Youth</p>
@@ -279,7 +277,9 @@ export default function GenerateReports() {
               </div>
 
               <div className="stat-card">
-                <div className="stat-icon green">✅</div>
+                <div className="stat-icon">
+                  <FaCheckCircle />
+                </div>
                 <div className="stat-info">
                   <h3>{stats.active}</h3>
                   <p>Active Youth</p>
@@ -287,7 +287,9 @@ export default function GenerateReports() {
               </div>
 
               <div className="stat-card">
-                <div className="stat-icon orange">📊</div>
+                <div className="stat-icon">
+                  <FaCalendarCheck />
+                </div>
                 <div className="stat-info">
                   <h3>{stats.programs}</h3>
                   <p>Total Programs</p>
@@ -295,7 +297,9 @@ export default function GenerateReports() {
               </div>
 
               <div className="stat-card">
-                <div className="stat-icon purple">📈</div>
+                <div className="stat-icon">
+                  <FaChartLine />
+                </div>
                 <div className="stat-info">
                   <h3>{stats.participation}%</h3>
                   <p>Participation Rate</p>
@@ -303,23 +307,23 @@ export default function GenerateReports() {
               </div>
             </div>
 
-            {/* Charts Section */}
-            <div className="charts-section">
+            {/* Charts Section - Side by Side */}
+            <div className="charts-container">
               <div className="chart-card">
                 <div className="chart-header">
                   <FaChartBar className="chart-icon" />
-                  <h4>Monthly Participation</h4>
+                  <h4>Monthly Participation Trends</h4>
                 </div>
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={monthlyData}>
-                    <XAxis dataKey="name" stroke="#666" />
-                    <YAxis stroke="#666" />
-                    <Tooltip 
-                      contentStyle={{ backgroundColor: "#fff", borderRadius: "8px", border: "1px solid #e0e0e0" }}
-                    />
-                    <Bar dataKey="value" fill="#3B82F6" radius={[8, 8, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
+                <div className="chart-wrapper">
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={monthlyData} margin={{ top: 10, right: 30, left: 0, bottom: 5 }}>
+                      <XAxis dataKey="name" stroke="#888" fontSize={12} />
+                      <YAxis stroke="#888" fontSize={12} />
+                      <Tooltip />
+                      <Bar dataKey="value" fill="#3B82F6" radius={[8, 8, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
               </div>
 
               <div className="chart-card">
@@ -327,55 +331,63 @@ export default function GenerateReports() {
                   <FaChartPie className="chart-icon" />
                   <h4>Gender Distribution</h4>
                 </div>
-                <ResponsiveContainer width="100%" height={300}>
-                  <PieChart>
-                    <Pie
-                      data={genderData}
-                      dataKey="value"
-                      nameKey="name"
-                      cx="50%"
-                      cy="50%"
-                      outerRadius={100}
-                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                    >
-                      {genderData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip />
-                    <Legend />
-                  </PieChart>
-                </ResponsiveContainer>
+                <div className="chart-wrapper">
+                  <ResponsiveContainer width="100%" height={300}>
+                    <PieChart>
+                      <Pie
+                        data={genderData}
+                        dataKey="value"
+                        nameKey="name"
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={100}
+                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                        labelLine={false}
+                      >
+                        {genderData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                      <Legend verticalAlign="bottom" height={36} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
               </div>
             </div>
 
-            {/* Program Participation Chart (if data exists) */}
+            {/* Program Participation Chart */}
             {programData.length > 0 && (
               <div className="chart-card full-width">
                 <div className="chart-header">
                   <FaChartBar className="chart-icon" />
-                  <h4>Program Participation</h4>
+                  <h4>Program Participation Overview</h4>
                 </div>
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={programData} layout="vertical">
-                    <XAxis type="number" stroke="#666" />
-                    <YAxis type="category" dataKey="name" stroke="#666" width={150} />
-                    <Tooltip />
-                    <Bar dataKey="value" fill="#F59E0B" radius={[0, 8, 8, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
+                <div className="chart-wrapper">
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={programData} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                      <XAxis type="number" stroke="#888" fontSize={12} />
+                      <YAxis type="category" dataKey="name" stroke="#888" fontSize={12} width={150} />
+                      <Tooltip />
+                      <Bar dataKey="value" fill="#F59E0B" radius={[0, 8, 8, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
               </div>
             )}
 
             {/* Detailed Report Table */}
-            {reportType === "detailed" && (
+            {reportType === "detailed" && filteredYouths.length > 0 && (
               <div className="detailed-report">
-                <h4>Detailed Youth List</h4>
+                <div className="detailed-header">
+                  <h4>Youth Directory</h4>
+                  <span className="record-count">{filteredYouths.length} records found</span>
+                </div>
                 <div className="table-container">
                   <table className="data-table">
                     <thead>
                       <tr>
-                        <th>Name</th>
+                        <th>Full Name</th>
                         <th>Gender</th>
                         <th>Age</th>
                         <th>Contact</th>
@@ -393,21 +405,22 @@ export default function GenerateReports() {
                           <td>{youth.contact || "-"}</td>
                           <td>{youth.email || "-"}</td>
                           <td>
-                            <span className={`status-badge ${(youth.status || "active").toLowerCase()}`}>
+                            <span className={`status-badge ${(youth.status || "Active").toLowerCase()}`}>
                               {youth.status || "Active"}
                             </span>
                           </td>
                           <td>{youth.created_at ? format(new Date(youth.created_at), "yyyy-MM-dd") : "-"}</td>
                         </tr>
                       ))}
-                      {filteredYouths.length === 0 && (
-                        <tr>
-                          <td colSpan="7" className="no-data">No youth data available</td>
-                        </tr>
-                      )}
                     </tbody>
                   </table>
                 </div>
+              </div>
+            )}
+
+            {reportType === "detailed" && filteredYouths.length === 0 && (
+              <div className="empty-state">
+                <p>No youth records found for the selected filters.</p>
               </div>
             )}
           </>

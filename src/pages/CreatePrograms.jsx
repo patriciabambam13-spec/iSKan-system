@@ -216,354 +216,281 @@ export default function CreateProgram() {
             <Navbar />
             <Toaster position="top-center" />
 
-            {/* Page Header */}
-
-            {/*<div className="page-header">
-                <button
-                    className="back-btn"
-                    onClick={() => navigate(-1)}
-                >
-                    <FaArrowLeft />
-                </button>
-
-                <div>
-                    <h2>Create Program</h2>
-                    <p>Set up a new SK program with rules and eligibility.</p>
-                </div>
-            </div>*/}
-
-            {/* SEPARATED PAGE HEADER */}
-            <div className="page-header-wrapper">
+            {/* Main Container - matches manage youth and register youth */}
+            <div className="create-program-container">
+                
+                {/* Header - matches exactly */}
                 <div className="page-header">
-                    <div className="page-header-left">
-                        <button className="back-btn" aria-label="Go back" onClick={() => navigate(-1)}>←</button>
-                        <div className="header-text">
-                          <h2>Create Program</h2>
-                          <p>Set up a new SK program with rules and eligibility.</p>
-                        </div>
+                    <button className="back-btn" aria-label="Go back" onClick={() => navigate(-1)}>←</button>
+                    <div className="header-text">
+                        <h2>Create Program</h2>
+                        <p>Set up a new SK program with rules and eligibility.</p>
                     </div>
                 </div>
-            </div>
 
-            {/* Forms */}
+                {/* Forms */}
+                <form
+                    className="register-form"
+                    onSubmit={(e) => e.preventDefault()}
+                >
 
-            <form
-                className="register-form"
-                onSubmit={(e) => e.preventDefault()}
-            >
-
-                {/* section 1 */}
-
-                <div className="section-card">
-
-                    <div className="section-title">
-                        <div className="section-number">1</div>
-                        <h3>Basic Program Information</h3>
-                    </div>
-
-                    <div>
-
-                        <div className="label-row">
-                            <label>Program Name</label>
-                            <span className="req">*</span>
+                    {/* section 1 - Basic Program Information */}
+                    <div className="section-card">
+                        <div className="section-title">
+                            <span className="section-number">1</span>
+                            <h3>Basic Program Information</h3>
                         </div>
 
-                        <input
-                            name="program_name"
-                            value={form.program_name}
-                            onChange={handleChange}
-                        />
+                        <div className="form-group">
+                            <label>Program Name <span className="req">*</span></label>
+                            <input
+                                name="program_name"
+                                value={form.program_name}
+                                onChange={handleChange}
+                                placeholder="Enter program name"
+                            />
+                            {errors.program_name &&
+                                <p className="error">{errors.program_name}</p>
+                            }
+                        </div>
 
-                        {errors.program_name &&
-                            <p className="error">{errors.program_name}</p>
-                        }
-
-                    </div>
-
-
-                    <div className="grid-2">
-
-                        <div>
-
-                            <div className="label-row">
-                                <label>Program Type</label>
-                                <span className="req">*</span>
+                        <div className="grid-2">
+                            <div className="form-group">
+                                <label>Program Type <span className="req">*</span></label>
+                                <select name="program_type" onChange={handleChange}>
+                                    <option value="">Select</option>
+                                    <option>Seminar</option>
+                                    <option>Training</option>
+                                    <option>Sports</option>
+                                    <option>Financial Aid</option>
+                                </select>
+                                {errors.program_type &&
+                                    <p className="error">{errors.program_type}</p>
+                                }
                             </div>
 
-                            <select
-                                name="program_type"
-                                onChange={handleChange}
-                            >
-                                <option value="">Select</option>
-                                <option>Seminar</option>
-                                <option>Training</option>
-                                <option>Sports</option>
-                                <option>Financial Aid</option>
-                            </select>
-
-                            {errors.program_type &&
-                                <p className="error">{errors.program_type}</p>
-                            }
-
-                        </div>
-
-
-                        <div>
-
-                            <div className="label-row">
+                            <div className="form-group">
                                 <label>Program Status</label>
-                                <span className="req">*</span>
+                                <select name="program_status" onChange={handleChange}>
+                                    <option value="">Select</option>
+                                    <option>Upcoming</option>
+                                    <option>Active</option>
+                                    <option>Completed</option>
+                                </select>
                             </div>
-
-                            <select
-                                name="program_status"
-                                onChange={handleChange}
-                            >
-                                <option value="">Select</option>
-                                <option>Upcoming</option>
-                                <option>Active</option>
-                                <option>Completed</option>
-                            </select>
-
                         </div>
 
-                    </div>
-
-
-                    <div>
-
-                        <div className="label-row">
+                        <div className="form-group">
                             <label>Description</label>
-                            <span className="req">*</span>
+                            <textarea
+                                name="description"
+                                onChange={handleChange}
+                                placeholder="Describe the program details..."
+                                rows="4"
+                            />
+                        </div>
+                    </div>
+
+                    {/* section 2 - Date and Schedule */}
+                    <div className="section-card">
+                        <div className="section-title">
+                            <span className="section-number">2</span>
+                            <h3>Date and Schedule</h3>
                         </div>
 
-                        <textarea
-                            name="description"
-                            onChange={handleChange}
-                        />
-
-                    </div>
-
-                </div>
-
-
-                {/* section 2 */}
-
-                <div className="section-card">
-
-                    <div className="section-title">
-                        <div className="section-number">2</div>
-                        <h3>Date and Schedule</h3>
-                    </div>
-
-                    <div className="grid-2">
-
-                        <div>
-
-                            <div className="label-row">
-                                <label>Start Date</label>
-                                <span className="req">*</span>
+                        <div className="grid-2">
+                            <div className="form-group">
+                                <label>Start Date <span className="req">*</span></label>
+                                <input
+                                    type="date"
+                                    name="start_date"
+                                    onChange={handleChange}
+                                />
+                                {errors.start_date &&
+                                    <p className="error">{errors.start_date}</p>
+                                }
                             </div>
 
-                            <input
-                                type="date"
-                                name="start_date"
-                                onChange={handleChange}
-                            />
-
-                            {errors.start_date &&
-                                <p className="error">{errors.start_date}</p>
-                            }
-
-                        </div>
-
-
-                        <div>
-
-                            <div className="label-row">
+                            <div className="form-group">
                                 <label>End Date</label>
-                                <span className="req">*</span>
+                                <input
+                                    type="date"
+                                    name="end_date"
+                                    onChange={handleChange}
+                                />
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* section 3 - Eligibility Requirements */}
+                    <div className="section-card">
+                        <div className="section-title">
+                            <span className="section-number">3</span>
+                            <h3>Eligibility Requirements</h3>
+                        </div>
+
+                        <div className="grid-2">
+                            <div className="form-group">
+                                <label>Minimum Age</label>
+                                <input
+                                    type="number"
+                                    name="min_age"
+                                    value={form.min_age}
+                                    onChange={handleChange}
+                                    placeholder="e.g., 15"
+                                />
                             </div>
 
+                            <div className="form-group">
+                                <label>Maximum Age</label>
+                                <input
+                                    type="number"
+                                    name="max_age"
+                                    value={form.max_age}
+                                    onChange={handleChange}
+                                    placeholder="e.g., 30"
+                                />
+                            </div>
+
+                            <div className="form-group">
+                                <label>Gender Restriction</label>
+                                <select name="gender" onChange={handleChange}>
+                                    <option value="">All Genders</option>
+                                    <option>Male</option>
+                                    <option>Female</option>
+                                </select>
+                            </div>
+
+                            <div className="form-group">
+                                <label>Residency Requirement</label>
+                                <select name="residency" onChange={handleChange}>
+                                    <option value="">No Restriction</option>
+                                    <option>Barangay Pinagkaisahan</option>
+                                    <option>Within City</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* section 4 - Required Documents */}
+                    <div className="section-card">
+                        <div className="section-title">
+                            <span className="section-number">4</span>
+                            <h3>Required Documents</h3>
+                        </div>
+
+                        <div className="confirm-row">
                             <input
-                                type="date"
-                                name="end_date"
+                                type="checkbox"
+                                name="require_id"
+                                checked={form.require_id}
                                 onChange={handleChange}
                             />
-
+                            <label>Require ID Verification</label>
                         </div>
 
+                        <div className="confirm-row">
+                            <input
+                                type="checkbox"
+                                name="require_school_id"
+                                checked={form.require_school_id}
+                                onChange={handleChange}
+                            />
+                            <label>Require School ID</label>
+                        </div>
                     </div>
 
-                </div>
+                    {/* section 5 - Budget Allocation */}
+                    <div className="section-card">
+                        <div className="section-title">
+                            <span className="section-number">5</span>
+                            <h3>Budget Allocation</h3>
+                        </div>
 
-
-                {/* section 3 */}
-
-                <div className="section-card">
-
-                    <div className="section-title">
-                        <div className="section-number">5</div>
-                        <h3>Required Documents</h3>
-                    </div>
-
-                    <div className="confirm-row">
-
-                        <input
-                            type="checkbox"
-                            name="require_id"
-                            onChange={handleChange}
-                        />
-
-                        <label>Require ID Verification</label>
-
-                    </div>
-
-                    <div className="confirm-row">
-
-                        <input
-                            type="checkbox"
-                            name="require_school"
-                            onChange={handleChange}
-                        />
-
-                        <label>Require School ID</label>
-
-                    </div>
-
-                </div>
-
-
-                {/* section 4 */}
-
-                <div className="section-card">
-
-                    <div className="section-title">
-                        <div className="section-number">6</div>
-                        <h3>Budget Allocation</h3>
-                    </div>
-
-                    <div className="grid-3">
-
-                        <div>
-
-                            <div className="label-row">
-                                <label>Allocated Budget</label>
-                                <span className="req">*</span>
+                        <div className="grid-3">
+                            <div className="form-group">
+                                <label>Allocated Budget <span className="req">*</span></label>
+                                <input
+                                    value={form.allocated_budget}
+                                    onChange={handleBudgetChange}
+                                    placeholder="₱ 0.00"
+                                />
+                                {errors.allocated_budget &&
+                                    <p className="error">{errors.allocated_budget}</p>
+                                }
                             </div>
 
-                            <input
-                                value={form.allocated_budget}
-                                onChange={handleBudgetChange}
-                                placeholder="₱ 0"
-                            />
-
-                        </div>
-
-
-                        <div>
-
-                            <div className="label-row">
-                                <label>Cost per Beneficiary (₱)</label>
-                                <span className="req">*</span>
+                            <div className="form-group">
+                                <label>Cost per Beneficiary (₱) <span className="req">*</span></label>
+                                <input
+                                    value={form.cost_per_beneficiary}
+                                    onChange={handleCostChange}
+                                    placeholder="₱ 0.00"
+                                />
+                                {errors.cost_per_beneficiary &&
+                                    <p className="error">{errors.cost_per_beneficiary}</p>
+                                }
                             </div>
 
-                            <input
-                                value={form.cost_per_beneficiary}
-                                onChange={handleCostChange}
-                                placeholder="₱ 0"
-                            />
-
-                        </div>
-
-
-                        <div>
-
-                            <div className="label-row">
+                            <div className="form-group">
                                 <label>Estimated Beneficiaries</label>
+                                <input
+                                    className="disabled-field"
+                                    value={form.estimated_beneficiaries}
+                                    disabled
+                                    placeholder="Auto-calculated"
+                                />
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Buttons */}
+                    <div className="form-buttons">
+                        <button type="button" className="cancel-btn" onClick={() => navigate("/dashboard")}>
+                            <FaTimes /> Cancel
+                        </button>
+
+                        <button type="button" className="clear-btn" onClick={() => window.location.reload()}>
+                            <FaTrash /> Clear Form
+                        </button>
+
+                        <button type="button" className="btn-secondary" onClick={() => saveProgram("draft")}>
+                            <FaFileAlt /> Save Draft
+                        </button>
+
+                        <button type="button" className="save-btn" onClick={() => saveProgram("active")}>
+                            <FaSave /> Save Program
+                        </button>
+                    </div>
+
+                </form>
+
+                {/* MODAL */}
+                {showModal && (
+                    <div className="overlay">
+                        <div className="qr-modal">
+                            <h2 className="qr-title">Program Successfully Created</h2>
+                            <p className="qr-sub">The program has been registered in the system.</p>
+
+                            <div className="qr-frame">
+                                <p>Program ID</p>
+                                <h3 className="qr-id">{programID}</h3>
+                                <p>Program Name</p>
+                                <h4>{form.program_name}</h4>
                             </div>
 
-                            <input
-                                className="disabled-field"
-                                value={form.estimated_beneficiaries}
-                                disabled
-                            />
-
+                            <div className="qr-buttons">
+                                <button className="btn-print" onClick={() => navigate("/programs")}>
+                                    View Programs
+                                </button>
+                                <button className="btn-register" onClick={() => window.location.reload()}>
+                                    Create Another
+                                </button>
+                            </div>
                         </div>
-
                     </div>
-
-                </div>
-
-            </form>
-
-
-   {/* buttons */}
-
-            <div className="form-buttons">
-
-                <button
-                    className="cancel-btn"
-                    onClick={() => navigate("/dashboard")}
-                >
-                    <FaTimes /> Cancel
-                </button>
-
-                <button
-                    className="clear-btn"
-                    onClick={() => window.location.reload()}
-                >
-                    <FaTrash /> Clear Form
-                </button>
-
-                <button
-                    className="btn-print"
-                    onClick={() => saveProgram("draft")}
-                >
-                    <FaFileAlt /> Save Draft
-                </button>
-
-                <button
-                    className="save-btn"
-                    onClick={() => saveProgram("active")}
-                >
-                    <FaSave /> Save Program
-                </button>
-
+                )}
             </div>
-
-          {/* MODAL */}
-
-            {showModal && (
-
-                <div className="overlay">
-
-                    <div className="qr-modal">
-
-                        <h2 className="qr-title">
-                            Program Successfully Created
-                        </h2>
-
-                        <p className="qr-sub">
-                            The program has been registered in the system.
-                        </p>
-
-                        <div className="qr-frame">
-
-                            <p>Program ID</p>
-                            <h3 className="qr-id">{programID}</h3>
-
-                            <p>Program Name</p>
-                            <h4>{form.program_name}</h4>
-
-                        </div>
-
-                    </div>
-
-                </div>
-
-            )}
-
         </>
     );
 }

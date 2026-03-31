@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, memo } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from 'react-router-dom';
 import Navbar from "../components/Navbar";
@@ -12,413 +12,547 @@ import {
 } from "react-icons/fa";
 import toast, { Toaster } from "react-hot-toast";
 
+const PAGE_SIZE = 8;
+
+// Edit Modal Component
+const EditModal = memo(({ show, youth, onClose, onSave }) => {
+  const [formData, setFormData] = useState({
+    id: null,
+    first_name: "",
+    last_name: "",
+    gender: "Male",
+    status: "Active",
+    contact: "",
+    email: "",
+    address: ""
+  });
+
+  useEffect(() => {
+    if (show && youth) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setFormData({
+        id: youth.id,
+        first_name: youth.first_name || "",
+        last_name: youth.last_name || "",
+        gender: youth.gender || "Male",
+        status: youth.status || "Active",
+        contact: youth.contact || "",
+        email: youth.email || "",
+        address: youth.address || ""
+      });
+    }
+  }, [show, youth?.id]);
+
+  const handleChange = (field, value) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (formData.id && onSave) {
+      onSave(formData);
+    }
+  };
+
+  if (!show || !youth) return null;
+
+  return createPortal(
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-content" onClick={e => e.stopPropagation()}>
+        <div className="modal-header">
+          <h2>Edit Youth Profile</h2>
+          <button className="modal-close" onClick={onClose}><FaTimes /></button>
+        </div>
+        
+        <form onSubmit={handleSubmit}>
+          <div className="form-group">
+            <label>First Name <span className="req">*</span></label>
+            <input 
+              value={formData.first_name} 
+              onChange={(e) => handleChange("first_name", e.target.value)} 
+              required 
+            />
+          </div>
+          
+          <div className="form-group">
+            <label>Last Name <span className="req">*</span></label>
+            <input 
+              value={formData.last_name} 
+              onChange={(e) => handleChange("last_name", e.target.value)} 
+              required 
+            />
+          </div>
+          
+          <div className="form-row">
+            <div className="form-group">
+              <label>Gender</label>
+              <select 
+                value={formData.gender} 
+                onChange={(e) => handleChange("gender", e.target.value)}
+              >
+                <option value="Male">Male</option>
+                <option value="Female">Female</option>
+              </select>
+            </div>
+            <div className="form-group">
+              <label>Status</label>
+              <select 
+                value={formData.status} 
+                onChange={(e) => handleChange("status", e.target.value)}
+              >
+                <option value="Active">Active</option>
+                <option value="Inactive">Inactive</option>
+              </select>
+            </div>
+          </div>
+          
+          <div className="form-group">
+            <label>Contact Number</label>
+            <input 
+              value={formData.contact} 
+              onChange={(e) => handleChange("contact", e.target.value)} 
+            />
+          </div>
+          
+          <div className="form-group">
+            <label>Email Address</label>
+            <input 
+              type="email" 
+              value={formData.email} 
+              onChange={(e) => handleChange("email", e.target.value)} 
+            />
+          </div>
+          
+          <div className="form-group">
+            <label>Address</label>
+            <textarea 
+              value={formData.address} 
+              onChange={(e) => handleChange("address", e.target.value)} 
+              rows="3" 
+            />
+          </div>
+          
+          <div className="modal-actions">
+            <button type="button" className="cancel-btn" onClick={onClose}>Cancel</button>
+            <button type="submit" className="save-btn">Save Changes</button>
+          </div>
+        </form>
+      </div>
+    </div>,
+    document.body
+  );
+});
+
+// Delete Modal Component
+const DeleteModal = memo(({ show, name, onClose, onConfirm }) => {
+  if (!show) return null;
+
+  return createPortal(
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-content delete-modal" onClick={e => e.stopPropagation()}>
+        <div className="modal-header">
+          <h2>Delete Youth Record</h2>
+          <button className="modal-close" onClick={onClose}><FaTimes /></button>
+        </div>
+        
+        <div className="delete-warning">
+          <FaTimesCircle />
+          <p>Are you sure you want to delete <strong>{name}</strong>?</p>
+          <small>This action cannot be undone.</small>
+        </div>
+        
+        <div className="modal-actions delete-modal-actions">
+          <button type="button" className="cancel-btn" onClick={onClose}>Cancel</button>
+          <button type="button" className="delete-confirm-btn" onClick={onConfirm}>Delete Permanently</button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+});
+
+// Main Component
 export default function ManageYouth() {
+  // State
   const [youths, setYouths] = useState([]);
-  const [search, setSearch] = useState("");
+  const [totalCount, setTotalCount] = useState(0);
+  const [isLoading, setIsLoading] = useState(false);
+  
+  // Filters
+  const [searchInput, setSearchInput] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
   const [genderFilter, setGenderFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const [totalCount, setTotalCount] = useState(0);
-
-  // ✅ PAGINATION STATE (FIXED)
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const limit = 8;
-
+  
+  // Modals
   const [selectedYouth, setSelectedYouth] = useState(null);
   const [transactions, setTransactions] = useState([]);
   const [activeTab, setActiveTab] = useState("details");
-
   const [showView, setShowView] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
   const [showDelete, setShowDelete] = useState(false);
-
-  // ✅ DEBOUNCE TIMER REF
-  const debounceTimer = useRef(null);
-
+  const [editTarget, setEditTarget] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  
   const navigate = useNavigate();
-
-  // Prevent body scroll when modals are open
-  useEffect(() => {
-    if (showView || showEdit || showDelete) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "auto";
-    }
-    return () => {
-      document.body.style.overflow = "auto";
-    };
-  }, [showView, showEdit, showDelete]);
-
-  // ✅ HELPER: FORMAT DATE (REUSABLE)
+  const debounceTimer = useRef(null);
+  
+  // Helpers
   const formatDate = (date) => date ? new Date(date).toLocaleDateString() : "-";
-
-  // ✅ FETCH YOUTH WITH PROPER ORDER AND PAGINATION (FIXED)
+  const getFullName = (youth) => `${youth?.first_name || ''} ${youth?.last_name || ''}`.trim();
+  
+  // Fetch youth
   const fetchYouth = useCallback(async () => {
     setIsLoading(true);
     
     try {
-      // First, get total count for pagination
-      let countQuery = supabase
-        .from("youth")
-        .select("*", { count: "exact", head: true });
-
-      // ✅ FIXED SEARCH - removed youth_id column
-      if (search) {
-        countQuery = countQuery.or(
-          `first_name.ilike.%${search}%,last_name.ilike.%${search}%,qr_code.ilike.%${search}%`
-        );
-      }
-      if (genderFilter) countQuery = countQuery.eq("gender", genderFilter);
-      if (statusFilter) countQuery = countQuery.eq("status", statusFilter);
-
-      const { count, error: countError } = await countQuery;
-      if (countError) throw countError;
+      let query = supabase.from("youth").select("*", { count: "exact" });
       
+      if (searchTerm) {
+        query = query.or(`first_name.ilike.%${searchTerm}%,last_name.ilike.%${searchTerm}%,qr_code.ilike.%${searchTerm}%`);
+      }
+      if (genderFilter) {
+        query = query.eq("gender", genderFilter);
+      }
+      if (statusFilter) {
+        query = query.eq("status", statusFilter);
+      }
+      
+      const { count, error: countError } = await query;
+      if (countError) throw countError;
       setTotalCount(count || 0);
-      setTotalPages(Math.ceil((count || 0) / limit));
-
-      // Then fetch paginated data with ✅ ORDER BY created_at
-      let query = supabase
+      
+      const from = (page - 1) * PAGE_SIZE;
+      const to = from + PAGE_SIZE - 1;
+      
+      let dataQuery = supabase
         .from("youth")
         .select("*")
         .order("created_at", { ascending: false })
-        .range((page - 1) * limit, page * limit - 1);
-
-      // ✅ FIXED SEARCH - removed youth_id column
-      if (search) {
-        query = query.or(
-          `first_name.ilike.%${search}%,last_name.ilike.%${search}%,qr_code.ilike.%${search}%`
-        );
+        .range(from, to);
+      
+      if (searchTerm) {
+        dataQuery = dataQuery.or(`first_name.ilike.%${searchTerm}%,last_name.ilike.%${searchTerm}%,qr_code.ilike.%${searchTerm}%`);
       }
-      if (genderFilter) query = query.eq("gender", genderFilter);
-      if (statusFilter) query = query.eq("status", statusFilter);
-
-      const { data, error } = await query;
-
+      if (genderFilter) {
+        dataQuery = dataQuery.eq("gender", genderFilter);
+      }
+      if (statusFilter) {
+        dataQuery = dataQuery.eq("status", statusFilter);
+      }
+      
+      const { data, error } = await dataQuery;
       if (error) throw error;
-
+      
       setYouths(data || []);
     } catch (error) {
-      console.error(error);
-      toast.error("Failed to load youth");
+      console.error("Fetch error:", error);
+      toast.error("Failed to load youth records");
     } finally {
       setIsLoading(false);
     }
-  }, [search, genderFilter, statusFilter, page, limit]);
-
-  // ✅ DEBOUNCED FETCH (FIXED - prevents too many refetches)
-  useEffect(() => {
-    if (debounceTimer.current) clearTimeout(debounceTimer.current);
-    
-    debounceTimer.current = setTimeout(() => {
-      fetchYouth();
-    }, 300);
-
-    return () => {
-      if (debounceTimer.current) clearTimeout(debounceTimer.current);
-    };
-  }, [search, genderFilter, statusFilter, page, fetchYouth]);
-
-  // Reset page when filters change
-  useEffect(() => {
-    setPage(1);
-  }, [search, genderFilter, statusFilter]);
-
-  // FETCH ALL TRANSACTIONS FOR SELECTED YOUTH
+  }, [searchTerm, genderFilter, statusFilter, page]);
+  
+  // Fetch transactions
   const fetchTransactions = async (youthId) => {
     try {
       const { data, error } = await supabase
         .from("transaction")
-        .select(`
-          *,
-          programs:program_id (
-            program_name,
-            start_date,
-            program_type
-          )
-        `)
+        .select(`*, programs:program_id (program_name, start_date, program_type)`)
         .eq("youth_id", youthId)
         .order("created_at", { ascending: false });
-
+      
       if (error) throw error;
       setTransactions(data || []);
     } catch (error) {
-      console.error("Error fetching transactions:", error);
+      console.error("Transactions error:", error);
       setTransactions([]);
     }
   };
-
-  // ✅ DELETE YOUTH (FIXED - added error handling)
-  const deleteYouth = async () => {
+  
+  // Delete youth - IMPROVED with .select() and proper state updates
+  const handleDelete = async () => {
+    if (!deleteTarget) {
+      toast.error("No record selected");
+      return;
+    }
+    
+    const deleteId = Number(deleteTarget.id);
+    const deleteName = getFullName(deleteTarget);
+    const loadingToast = toast.loading(`Deleting ${deleteName}...`);
+    
     try {
-      const { error } = await supabase
+      // IMPORTANT: Added .select() to verify deletion
+      const { data, error } = await supabase
         .from("youth")
         .delete()
-        .eq("id", selectedYouth.id);
-
-      if (error) throw error;
-
-      toast.success("Youth deleted successfully");
+        .eq("id", deleteId)
+        .select(); // 👈 KEY FIX - verifies what was deleted
+      
+      console.log("DELETE RESULT:", data, error);
+      
+      if (error) {
+        console.error("Delete error:", error);
+        toast.error(`Delete failed: ${error.message}`, { id: loadingToast });
+        return;
+      }
+      
+      // Check if anything was actually deleted
+      if (!data || data.length === 0) {
+        throw new Error("No row deleted. Check RLS policy or ID.");
+      }
+      
+      toast.success(`${deleteName} deleted successfully`, { id: loadingToast });
+      
+      // Update UI with functional state to avoid stale closures
+      setYouths(prev => {
+        const updated = prev.filter(y => y.id !== deleteId);
+        
+        // Handle pagination if current page becomes empty
+        if (updated.length === 0 && page > 1) {
+          setPage(prevPage => prevPage - 1);
+        }
+        
+        return updated;
+      });
+      
+      setTotalCount(prev => prev - 1);
       setShowDelete(false);
-      setSelectedYouth(null);
-      fetchYouth();
+      setDeleteTarget(null);
+      
+      // Optional background refresh for perfect sync
+      setTimeout(() => fetchYouth(), 500);
+      
     } catch (error) {
       console.error("Delete error:", error);
-      toast.error(error.message || "Delete failed - check RLS policies");
+      toast.error(`Delete failed: ${error.message}`, { id: loadingToast });
     }
   };
-
-  // UPDATE YOUTH
-  const updateYouth = async (e) => {
-    e.preventDefault();
-
+  
+  // Update youth
+  const handleUpdate = async (formData) => {
     try {
       const { error } = await supabase
         .from("youth")
         .update({
-          first_name: selectedYouth.first_name,
-          last_name: selectedYouth.last_name,
-          gender: selectedYouth.gender,
-          status: selectedYouth.status,
-          contact: selectedYouth.contact,
-          email: selectedYouth.email,
-          address: selectedYouth.address
+          first_name: formData.first_name,
+          last_name: formData.last_name,
+          gender: formData.gender,
+          status: formData.status,
+          contact: formData.contact,
+          email: formData.email,
+          address: formData.address
         })
-        .eq("id", selectedYouth.id);
-
+        .eq("id", formData.id);
+      
       if (error) throw error;
-
+      
       toast.success("Youth updated successfully");
       setShowEdit(false);
-      fetchYouth();
+      setEditTarget(null);
+      await fetchYouth();
       
-      // Update selected youth data
-      if (showView) {
-        setSelectedYouth(prev => ({ ...prev, ...selectedYouth }));
+      if (showView && selectedYouth?.id === formData.id) {
+        setSelectedYouth(prev => ({ ...prev, ...formData }));
       }
     } catch (error) {
       console.error("Update error:", error);
-      toast.error("Update failed");
+      toast.error("Update failed: " + error.message);
     }
   };
-
-  // Handle view youth details
-  const handleViewYouth = async (youth) => {
+  
+  // Handlers
+  const handleSearch = () => {
+    setSearchTerm(searchInput);
+    setPage(1);
+  };
+  
+  const handleClearFilters = () => {
+    setSearchInput("");
+    setSearchTerm("");
+    setGenderFilter("");
+    setStatusFilter("");
+    setPage(1);
+  };
+  
+  const handleOpenEdit = (youth) => {
+    setEditTarget(youth);
+    setShowEdit(true);
+  };
+  
+  const handleOpenDelete = (youth) => {
+    setDeleteTarget(youth);
+    setShowDelete(true);
+  };
+  
+  const handleOpenView = async (youth) => {
     setSelectedYouth(youth);
     setActiveTab("details");
     await fetchTransactions(youth.id);
     setShowView(true);
   };
-
-  // ✅ CLEAN FILTERED DATA (FIXED)
+  
+  const handlePageChange = (newPage) => {
+    setPage(newPage);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+  
+  // Stats
+  const totalPages = Math.ceil(totalCount / PAGE_SIZE);
   const attendance = transactions.filter(t => t.type === "Attendance");
-  const requests = transactions.filter(t => t.type !== "Attendance");
-
   const stats = {
     total: transactions.length,
     attendance: attendance.length,
-    requests: requests.length
+    requests: transactions.filter(t => t.type !== "Attendance").length
   };
-
-  // Export to CSV
+  
+  // Effects
+  useEffect(() => {
+    fetchYouth();
+  }, [fetchYouth]);
+  
+  useEffect(() => {
+    if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    debounceTimer.current = setTimeout(() => {
+      if (genderFilter || statusFilter) setPage(1);
+    }, 300);
+    return () => clearTimeout(debounceTimer.current);
+  }, [genderFilter, statusFilter]);
+  
+  useEffect(() => {
+    setPage(1);
+  }, [searchTerm]);
+  
+  useEffect(() => {
+    document.body.style.overflow = (showView || showEdit || showDelete) ? "hidden" : "auto";
+    return () => { document.body.style.overflow = "auto"; };
+  }, [showView, showEdit, showDelete]);
+  
+  // Export
   const exportCSV = () => {
-    const headers = ["Full Name", "Youth ID", "Age", "Gender", "Status", "Contact", "Email", "Date Registered"];
+    const headers = ["Full Name", "QR Code", "Age", "Gender", "Status", "Contact", "Email", "Date Registered"];
     const rows = youths.map(y => [
-      `${y.first_name || ''} ${y.last_name || ''}`.trim(),
-      y.qr_code || "-",
-      y.age || "-",
-      y.gender || "-",
-      y.status || "Active",
-      y.contact || "-",
-      y.email || "-",
-      formatDate(y.created_at)
+      getFullName(y), y.qr_code || "-", y.age || "-", y.gender || "-",
+      y.status || "Active", y.contact || "-", y.email || "-", formatDate(y.created_at)
     ]);
-
-    let csvContent = headers.join(",") + "\n";
-    rows.forEach(row => {
-      csvContent += row.map(cell => `"${cell || ''}"`).join(",") + "\n";
-    });
-
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    
+    const csvContent = [headers, ...rows].map(row => row.map(cell => `"${cell}"`).join(",")).join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv" });
     const link = document.createElement("a");
-    const url = URL.createObjectURL(blob);
-    link.href = url;
-    link.setAttribute("download", `youth_records_${new Date().toISOString().split('T')[0]}.csv`);
-    document.body.appendChild(link);
+    link.href = URL.createObjectURL(blob);
+    link.download = `youth_records_${new Date().toISOString().split('T')[0]}.csv`;
     link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-    toast.success("CSV exported successfully!");
+    URL.revokeObjectURL(link.href);
+    toast.success("CSV exported!");
   };
-
-  // Export to PDF
-  const exportPDF = () => {
-    window.print();
-  };
-
-  // ✅ HANDLE PAGE CHANGE (FIXED)
-  const goToPage = (newPage) => {
-    if (newPage >= 1 && newPage <= totalPages) {
-      setPage(newPage);
+  
+  const exportPDF = () => window.print();
+  
+  // Pagination
+  const renderPagination = () => {
+    if (totalPages <= 1) return null;
+    
+    const pages = [];
+    const maxVisible = 5;
+    let start = Math.max(1, page - Math.floor(maxVisible / 2));
+    let end = Math.min(totalPages, start + maxVisible - 1);
+    
+    if (end - start + 1 < maxVisible) start = Math.max(1, end - maxVisible + 1);
+    
+    for (let i = start; i <= end; i++) {
+      pages.push(
+        <button key={i} className={`page-btn ${page === i ? "active" : ""}`} onClick={() => handlePageChange(i)}>
+          {i}
+        </button>
+      );
     }
+    
+    return (
+      <div className="pagination">
+        <button className="page-btn" onClick={() => handlePageChange(page - 1)} disabled={page === 1}>Previous</button>
+        {pages}
+        <button className="page-btn" onClick={() => handlePageChange(page + 1)} disabled={page === totalPages}>Next</button>
+      </div>
+    );
   };
-
-  // Modal Components using Portal
+  
+  // View Modal
   const ViewModal = () => {
-    if (!(showView && selectedYouth)) return null;
+    if (!showView || !selectedYouth) return null;
     
     return createPortal(
       <div className="modal-overlay" onClick={() => setShowView(false)}>
-        <div className="modal-content large-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-content large-modal" onClick={e => e.stopPropagation()}>
           <div className="modal-header">
             <h2>Youth Profile</h2>
-            <button className="modal-close" onClick={() => setShowView(false)}>
-              <FaTimes />
-            </button>
+            <button className="modal-close" onClick={() => setShowView(false)}><FaTimes /></button>
           </div>
-
-          {/* Youth Summary Card */}
+          
           <div className="youth-summary">
             <div className="youth-avatar-large">
               {selectedYouth.photo_url ? (
                 <img src={selectedYouth.photo_url} alt={selectedYouth.first_name} />
               ) : (
-                <div className="avatar-placeholder-large">
-                  <FaUser />
-                </div>
+                <div className="avatar-placeholder-large"><FaUser /></div>
               )}
             </div>
             <div className="youth-basic-info">
-              <h3>{`${selectedYouth.first_name || ''} ${selectedYouth.last_name || ''}`.trim()}</h3>
+              <h3>{getFullName(selectedYouth)}</h3>
               <p className="youth-id">ID: {selectedYouth.qr_code || '-'}</p>
               <span className={`status-badge ${(selectedYouth.status || "Active").toLowerCase()}`}>
                 {selectedYouth.status || "Active"}
               </span>
             </div>
           </div>
-
-          {/* Stats Cards */}
+          
           <div className="modal-stats">
-            <div className="stat-card-mini">
-              <FaChartLine />
-              <div>
-                <span className="stat-number">{stats.total}</span>
-                <span className="stat-label">Total Activities</span>
-              </div>
-            </div>
-            <div className="stat-card-mini">
-              <FaCalendarCheck />
-              <div>
-                <span className="stat-number">{stats.attendance}</span>
-                <span className="stat-label">Programs Attended</span>
-              </div>
-            </div>
-            <div className="stat-card-mini">
-              <FaMoneyBillWave />
-              <div>
-                <span className="stat-number">{stats.requests}</span>
-                <span className="stat-label">Requests Made</span>
-              </div>
-            </div>
+            <div className="stat-card-mini"><FaChartLine /><div><span className="stat-number">{stats.total}</span><span className="stat-label">Total Activities</span></div></div>
+            <div className="stat-card-mini"><FaCalendarCheck /><div><span className="stat-number">{stats.attendance}</span><span className="stat-label">Programs Attended</span></div></div>
+            <div className="stat-card-mini"><FaMoneyBillWave /><div><span className="stat-number">{stats.requests}</span><span className="stat-label">Requests Made</span></div></div>
           </div>
-
-          {/* Tabs */}
+          
           <div className="modal-tabs">
-            <button 
-              className={`tab-btn ${activeTab === "details" ? "active" : ""}`}
-              onClick={() => setActiveTab("details")}
-            >
-              <FaUser /> Personal Info
-            </button>
-            <button 
-              className={`tab-btn ${activeTab === "transactions" ? "active" : ""}`}
-              onClick={() => setActiveTab("transactions")}
-            >
-              <FaMoneyBillWave /> All Transactions ({stats.total})
-            </button>
-            <button 
-              className={`tab-btn ${activeTab === "attendance" ? "active" : ""}`}
-              onClick={() => setActiveTab("attendance")}
-            >
-              <FaCalendarCheck /> Program Attendance ({stats.attendance})
-            </button>
+            <button className={`tab-btn ${activeTab === "details" ? "active" : ""}`} onClick={() => setActiveTab("details")}><FaUser /> Personal Info</button>
+            <button className={`tab-btn ${activeTab === "transactions" ? "active" : ""}`} onClick={() => setActiveTab("transactions")}><FaMoneyBillWave /> All Transactions ({stats.total})</button>
+            <button className={`tab-btn ${activeTab === "attendance" ? "active" : ""}`} onClick={() => setActiveTab("attendance")}><FaCalendarCheck /> Program Attendance ({stats.attendance})</button>
           </div>
-
+          
           <div className="modal-body">
-            {/* Personal Info Tab */}
             {activeTab === "details" && (
               <div className="personal-info-grid">
-                <div className="info-group">
-                  <label>Full Name</label>
-                  <p>{`${selectedYouth.first_name || ''} ${selectedYouth.last_name || ''}`.trim()}</p>
-                </div>
-                <div className="info-group">
-                  <label>Youth ID</label>
-                  <p>{selectedYouth.qr_code || '-'}</p>
-                </div>
-                <div className="info-group">
-                  <label>Age</label>
-                  <p>{selectedYouth.age || '-'}</p>
-                </div>
-                <div className="info-group">
-                  <label>Gender</label>
-                  <p>{selectedYouth.gender || '-'}</p>
-                </div>
-                <div className="info-group">
-                  <label>Contact Number</label>
-                  <p>{selectedYouth.contact || '-'}</p>
-                </div>
-                <div className="info-group">
-                  <label>Email Address</label>
-                  <p>{selectedYouth.email || '-'}</p>
-                </div>
-                <div className="info-group">
-                  <label>Address</label>
-                  <p>{selectedYouth.address || '-'}</p>
-                </div>
-                <div className="info-group">
-                  <label>Barangay</label>
-                  <p>{selectedYouth.barangay || 'Barangay Pinagkaisahan'}</p>
-                </div>
-                <div className="info-group">
-                  <label>Date Registered</label>
-                  <p>{formatDate(selectedYouth.created_at)}</p>
-                </div>
+                <div className="info-group"><label>Full Name</label><p>{getFullName(selectedYouth)}</p></div>
+                <div className="info-group"><label>Youth ID</label><p>{selectedYouth.qr_code || '-'}</p></div>
+                <div className="info-group"><label>Age</label><p>{selectedYouth.age || '-'}</p></div>
+                <div className="info-group"><label>Gender</label><p>{selectedYouth.gender || '-'}</p></div>
+                <div className="info-group"><label>Contact Number</label><p>{selectedYouth.contact || '-'}</p></div>
+                <div className="info-group"><label>Email Address</label><p>{selectedYouth.email || '-'}</p></div>
+                <div className="info-group"><label>Address</label><p>{selectedYouth.address || '-'}</p></div>
+                <div className="info-group"><label>Barangay</label><p>{selectedYouth.barangay || 'Barangay Pinagkaisahan'}</p></div>
+                <div className="info-group"><label>Date Registered</label><p>{formatDate(selectedYouth.created_at)}</p></div>
               </div>
             )}
-
-            {/* All Transactions Tab */}
-            {activeTab === "transactions" && (
+            
+            {(activeTab === "transactions" || activeTab === "attendance") && (
               <div className="transactions-list">
-                {transactions.length === 0 ? (
-                  <div className="empty-transactions">
-                    <FaMoneyBillWave />
-                    <p>No transactions yet for this youth</p>
-                    <small>Transactions will appear when youth participates in programs</small>
-                  </div>
+                {(activeTab === "attendance" ? attendance : transactions).length === 0 ? (
+                  <div className="empty-transactions"><FaCalendarCheck /><p>No records found</p></div>
                 ) : (
-                  transactions.map((transaction, idx) => (
+                  (activeTab === "attendance" ? attendance : transactions).map((record, idx) => (
                     <div key={idx} className="transaction-card">
-                      <div className="transaction-icon">
-                        {transaction.type === "Attendance" ? <FaCalendarCheck /> : <FaMoneyBillWave />}
-                      </div>
+                      <div className="transaction-icon">{record.type === "Attendance" ? <FaCalendarCheck /> : <FaMoneyBillWave />}</div>
                       <div className="transaction-details">
                         <div className="transaction-header">
-                          <span className="transaction-type">{transaction.type || 'Transaction'}</span>
-                          <span className="transaction-date">
-                            {formatDate(transaction.created_at)}
-                          </span>
+                          <span className="transaction-type">{record.type || 'Transaction'}</span>
+                          <span className="transaction-date">{formatDate(record.created_at)}</span>
                         </div>
-                        {transaction.type === "Attendance" ? (
-                          <p className="transaction-program">
-                            Program: {transaction.programs?.program_name || 'Unknown Program'}
-                          </p>
+                        {record.type === "Attendance" ? (
+                          <p className="transaction-program">Program: {record.programs?.program_name || 'Unknown'}</p>
                         ) : (
-                          <p className="transaction-amount">Amount: ₱{transaction.amount || '0.00'}</p>
+                          <p className="transaction-amount">Amount: ₱{record.amount || '0.00'}</p>
                         )}
-                        <span className={`status-badge ${(transaction.transaction_status || "completed").toLowerCase()}`}>
-                          {transaction.transaction_status || "Completed"}
+                        <span className={`status-badge ${(record.transaction_status || "completed").toLowerCase()}`}>
+                          {record.transaction_status || "Completed"}
                         </span>
                       </div>
                     </div>
@@ -426,200 +560,26 @@ export default function ManageYouth() {
                 )}
               </div>
             )}
-
-            {/* Program Attendance Tab */}
-            {activeTab === "attendance" && (
-              <div className="attendance-list">
-                {attendance.length === 0 ? (
-                  <div className="empty-attendance">
-                    <FaCalendarCheck />
-                    <p>No program attendance records</p>
-                    <small>Scan youth QR code at programs to record attendance</small>
-                  </div>
-                ) : (
-                  attendance.map((record, idx) => (
-                    <div key={idx} className="attendance-card">
-                      <div className="attendance-icon">
-                        <FaCalendarCheck />
-                      </div>
-                      <div className="attendance-details">
-                        <div className="attendance-header">
-                          <span className="program-name">{record.programs?.program_name || 'Unknown Program'}</span>
-                          <span className="attendance-date">
-                            {record.programs?.start_date ? formatDate(record.programs.start_date) : '-'}
-                          </span>
-                        </div>
-                        <div className="attendance-meta">
-                          <span className="program-type">{record.programs?.program_type || 'General'}</span>
-                          <span className={`status-badge ${(record.transaction_status || "completed").toLowerCase()}`}>
-                            {record.transaction_status || "Present"}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            )}
           </div>
-
+          
           <div className="modal-footer">
             <button className="btn-secondary" onClick={() => setShowView(false)}>Close</button>
-            <button className="btn-primary" onClick={() => {
-              setShowView(false);
-              setShowEdit(true);
-            }}>Edit Profile</button>
+            <button className="btn-primary" onClick={() => { setShowView(false); handleOpenEdit(selectedYouth); }}>Edit Profile</button>
           </div>
         </div>
       </div>,
       document.body
     );
   };
-
-  const EditModal = () => {
-    if (!(showEdit && selectedYouth)) return null;
-    
-    return createPortal(
-      <div className="modal-overlay" onClick={() => setShowEdit(false)}>
-        <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-          <div className="modal-header">
-            <h2>Edit Youth Profile</h2>
-            <button className="modal-close" onClick={() => setShowEdit(false)}>
-              <FaTimes />
-            </button>
-          </div>
-          <form onSubmit={updateYouth}>
-            <div className="form-group">
-              <label>First Name <span className="req">*</span></label>
-              <input
-                value={selectedYouth.first_name || ''}
-                onChange={(e) => setSelectedYouth({ ...selectedYouth, first_name: e.target.value })}
-                required
-              />
-            </div>
-            <div className="form-group">
-              <label>Last Name <span className="req">*</span></label>
-              <input
-                value={selectedYouth.last_name || ''}
-                onChange={(e) => setSelectedYouth({ ...selectedYouth, last_name: e.target.value })}
-                required
-              />
-            </div>
-            <div className="form-row">
-              <div className="form-group">
-                <label>Gender</label>
-                <select
-                  value={selectedYouth.gender || "Male"}
-                  onChange={(e) => setSelectedYouth({ ...selectedYouth, gender: e.target.value })}
-                >
-                  <option value="Male">Male</option>
-                  <option value="Female">Female</option>
-                </select>
-              </div>
-              <div className="form-group">
-                <label>Status</label>
-                <select
-                  value={selectedYouth.status || "Active"}
-                  onChange={(e) => setSelectedYouth({ ...selectedYouth, status: e.target.value })}
-                >
-                  <option value="Active">Active</option>
-                  <option value="Inactive">Inactive</option>
-                </select>
-              </div>
-            </div>
-            <div className="form-group">
-              <label>Contact Number</label>
-              <input
-                value={selectedYouth.contact || ''}
-                onChange={(e) => setSelectedYouth({ ...selectedYouth, contact: e.target.value })}
-              />
-            </div>
-            <div className="form-group">
-              <label>Email Address</label>
-              <input
-                type="email"
-                value={selectedYouth.email || ''}
-                onChange={(e) => setSelectedYouth({ ...selectedYouth, email: e.target.value })}
-              />
-            </div>
-            <div className="form-group">
-              <label>Address</label>
-              <textarea
-                value={selectedYouth.address || ''}
-                onChange={(e) => setSelectedYouth({ ...selectedYouth, address: e.target.value })}
-                rows="3"
-              />
-            </div>
-            <div className="modal-actions">
-              <button type="button" className="cancel-btn" onClick={() => setShowEdit(false)}>Cancel</button>
-              <button type="submit" className="save-btn">Save Changes</button>
-            </div>
-          </form>
-        </div>
-      </div>,
-      document.body
-    );
-  };
-
-  const DeleteModal = () => {
-    if (!(showDelete && selectedYouth)) return null;
-    
-    return createPortal(
-      <div className="modal-overlay" onClick={() => setShowDelete(false)}>
-        <div className="modal-content delete-modal" onClick={(e) => e.stopPropagation()}>
-          <div className="modal-header">
-            <h2>Delete Youth Record</h2>
-            <button className="modal-close" onClick={() => setShowDelete(false)}>
-              <FaTimes />
-            </button>
-          </div>
-          <div className="delete-warning">
-            <FaTimesCircle />
-            <p>Are you sure you want to delete <strong>{`${selectedYouth.first_name || ''} ${selectedYouth.last_name || ''}`.trim()}</strong>?</p>
-            <small>This action cannot be undone.</small>
-          </div>
-          <div className="modal-actions">
-            <button className="cancel-btn" onClick={() => setShowDelete(false)}>Cancel</button>
-            <button className="delete-confirm-btn" onClick={deleteYouth}>Delete Permanently</button>
-          </div>
-        </div>
-      </div>,
-      document.body
-    );
-  };
-
-  // ✅ PAGINATION BUTTONS GENERATOR
-  const renderPaginationButtons = () => {
-    const buttons = [];
-    const maxButtons = 5;
-    let startPage = Math.max(1, page - Math.floor(maxButtons / 2));
-    let endPage = Math.min(totalPages, startPage + maxButtons - 1);
-    
-    if (endPage - startPage + 1 < maxButtons) {
-      startPage = Math.max(1, endPage - maxButtons + 1);
-    }
-
-    for (let i = startPage; i <= endPage; i++) {
-      buttons.push(
-        <button
-          key={i}
-          className={`page-btn ${page === i ? "active" : ""}`}
-          onClick={() => goToPage(i)}
-        >
-          {i}
-        </button>
-      );
-    }
-    return buttons;
-  };
-
+  
+  // Main render
   return (
     <>
       <Navbar />
       <Toaster position="top-center" />
-
+      
       <div className="manage-youth-container">
-        {/* PAGE HEADER */}
+        {/* Header */}
         <div className="page-header">
           <button className="back-btn" onClick={() => navigate(-1)}>←</button>
           <div className="header-text">
@@ -630,60 +590,51 @@ export default function ManageYouth() {
             <FaUserPlus /> Register New Youth
           </button>
         </div>
-
-        {/* FILTER SECTION */}
+        
+        {/* Filters */}
         <div className="filter-section">
           <div className="search-box">
             <FaSearch className="search-icon" />
             <input
               placeholder="Search by name or QR code..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              value={searchInput}
+              onChange={e => setSearchInput(e.target.value)}
+              onKeyPress={e => e.key === 'Enter' && handleSearch()}
             />
+            <button type="button" className="search-submit" onClick={handleSearch}>Search</button>
           </div>
-          <select value={genderFilter} onChange={(e) => setGenderFilter(e.target.value)}>
+          
+          <select value={genderFilter} onChange={e => setGenderFilter(e.target.value)}>
             <option value="">All Gender</option>
             <option value="Male">Male</option>
             <option value="Female">Female</option>
           </select>
-          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+          
+          <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
             <option value="">All Status</option>
             <option value="Active">Active</option>
             <option value="Inactive">Inactive</option>
           </select>
-          <button className="clear-filters-btn" onClick={() => {
-            setSearch("");
-            setGenderFilter("");
-            setStatusFilter("");
-            setPage(1);
-          }}>
-            Clear Filters
-          </button>
+          
+          <button className="clear-filters-btn" onClick={handleClearFilters}>Clear Filters</button>
         </div>
-
-        {/* RECORD BAR */}
+        
+        {/* Record bar */}
         <div className="record-bar">
           <div className="record-info">
             <span className="record-count">{totalCount}</span>
             <span>youth records found</span>
           </div>
           <div className="export-buttons">
-            <button className="export-btn csv" onClick={exportCSV}>
-              <FaFileCsv /> CSV
-            </button>
-            <button className="export-btn pdf" onClick={exportPDF}>
-              <FaFilePdf /> PDF
-            </button>
+            <button className="export-btn csv" onClick={exportCSV}><FaFileCsv /> CSV</button>
+            <button className="export-btn pdf" onClick={exportPDF}><FaFilePdf /> PDF</button>
           </div>
         </div>
-
-        {/* YOUTH TABLE */}
+        
+        {/* Table */}
         <div className="table-container">
           {isLoading ? (
-            <div className="loading-state">
-              <div className="spinner"></div>
-              <p>Loading youth records...</p>
-            </div>
+            <div className="loading-state"><div className="spinner"></div><p>Loading...</p></div>
           ) : youths.length === 0 ? (
             <div className="empty-state">
               <div className="empty-icon">👥</div>
@@ -694,34 +645,19 @@ export default function ManageYouth() {
             <div className="table-responsive">
               <table className="youth-table">
                 <thead>
-                  <tr>
-                    <th>Photo</th>
-                    <th>Full Name</th>
-                    <th>QR Code</th>
-                    <th>Age</th>
-                    <th>Gender</th>
-                    <th>Status</th>
-                    <th>Date Registered</th>
-                    <th>Actions</th>
-                  </tr>
+                  <tr><th>Photo</th><th>Full Name</th><th>QR Code</th><th>Age</th><th>Gender</th><th>Status</th><th>Date Registered</th><th>Actions</th></tr>
                 </thead>
                 <tbody>
-                  {youths.map((youth) => (
+                  {youths.map(youth => (
                     <tr key={youth.id}>
                       <td className="photo-cell">
                         {youth.photo_url ? (
                           <img src={youth.photo_url} alt={youth.first_name} className="youth-photo" />
                         ) : (
-                          <div className="photo-placeholder">
-                            <FaUser />
-                          </div>
+                          <div className="photo-placeholder"><FaUser /></div>
                         )}
                       </td>
-                      <td className="name-cell">
-                        <div className="youth-name">
-                          {`${youth.first_name || ''} ${youth.last_name || ''}`.trim()}
-                        </div>
-                      </td>
+                      <td className="name-cell"><div className="youth-name">{getFullName(youth)}</div></td>
                       <td className="id-cell">{youth.qr_code || '-'}</td>
                       <td className="age-cell">{youth.age || '-'}</td>
                       <td className="gender-cell">{youth.gender || '-'}</td>
@@ -730,25 +666,11 @@ export default function ManageYouth() {
                           {youth.status || "Active"}
                         </span>
                       </td>
-                      <td className="date-cell">
-                        {formatDate(youth.created_at)}
-                      </td>
+                      <td className="date-cell">{formatDate(youth.created_at)}</td>
                       <td className="actions-cell">
-                        <button className="action-btn view" onClick={() => handleViewYouth(youth)} title="View Details">
-                          <FaEye />
-                        </button>
-                        <button className="action-btn edit" onClick={() => {
-                          setSelectedYouth(youth);
-                          setShowEdit(true);
-                        }} title="Edit Youth">
-                          <FaEdit />
-                        </button>
-                        <button className="action-btn delete" onClick={() => {
-                          setSelectedYouth(youth);
-                          setShowDelete(true);
-                        }} title="Delete Youth">
-                          <FaTimesCircle />
-                        </button>
+                        <button className="action-btn view" onClick={() => handleOpenView(youth)}><FaEye /></button>
+                        <button className="action-btn edit" onClick={() => handleOpenEdit(youth)}><FaEdit /></button>
+                        <button className="action-btn delete" onClick={() => handleOpenDelete(youth)}><FaTimesCircle /></button>
                       </td>
                     </tr>
                   ))}
@@ -757,33 +679,31 @@ export default function ManageYouth() {
             </div>
           )}
         </div>
-
-        {/* ✅ REAL PAGINATION (FIXED) */}
-        {totalPages > 1 && (
-          <div className="pagination">
-            <button 
-              className="page-btn" 
-              onClick={() => goToPage(page - 1)}
-              disabled={page === 1}
-            >
-              Previous
-            </button>
-            {renderPaginationButtons()}
-            <button 
-              className="page-btn" 
-              onClick={() => goToPage(page + 1)}
-              disabled={page === totalPages}
-            >
-              Next
-            </button>
-          </div>
-        )}
+        
+        {/* Pagination */}
+        {renderPagination()}
       </div>
-
-      {/* Modals rendered via Portal */}
+      
+      {/* Modals */}
       <ViewModal />
-      <EditModal />
-      <DeleteModal />
+      <EditModal 
+        show={showEdit} 
+        youth={editTarget} 
+        onClose={() => {
+          setShowEdit(false);
+          setEditTarget(null);
+        }} 
+        onSave={handleUpdate} 
+      />
+      <DeleteModal 
+        show={showDelete} 
+        name={deleteTarget ? getFullName(deleteTarget) : ""} 
+        onClose={() => {
+          setShowDelete(false);
+          setDeleteTarget(null);
+        }} 
+        onConfirm={handleDelete} 
+      />
     </>
   );
 }
