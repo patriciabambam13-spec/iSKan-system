@@ -214,7 +214,7 @@ export default function SKChairmanDashboard() {
   };
 
   const menuItems = [
-    { name: "Dashboard", icon: FaTachometerAlt, path: "/dashboard" },
+    { name: "Dashboard", icon: FaTachometerAlt, path: "/chairman-dashboard" },
     { name: "Manage Youth", icon: FaUsers, path: "/manage-youth" },
     { name: "Create Program", icon: FaPlusCircle, path: "/create-programs" },
     { name: "Generate Reports", icon: FaChartLine, path: "/generate-reports" },

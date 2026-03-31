@@ -10,6 +10,7 @@ import CreatePrograms from "./pages/CreatePrograms";
 import ManageYouth from "./pages/manageYouth";
 import Settings from "./pages/Settings";
 import GenerateReports from "./pages/GenerateReports";
+import AuditLogs from "./pages/AuditLogs"; 
 
 function App() {
   return (
@@ -24,7 +25,7 @@ function App() {
         <Route path="/generate-reports" element={<GenerateReports />} />
         <Route path="/scan" element={<ScanQr />} />
         <Route path="/create-programs" element={<CreatePrograms />} />
-
+         <Route path="/audit-logs" element={<AuditLogs />} /> 
         <Route path="/manage-youth" element={<ManageYouth />} />
         <Route path="/settings" element={<Settings />} />
       </Routes>
