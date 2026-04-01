@@ -10,7 +10,7 @@ import { format } from "date-fns";
 import { FaFileCsv, FaChartBar, FaChartPie, FaFilter, FaUsers, FaCheckCircle, FaCalendarCheck, FaChartLine, FaPrint, FaFilePdf } from "react-icons/fa";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import "../styles/generateReports.css";
+import "../styles/GenerateReports.css";
 
 const CHART_COLORS = ["#3B82F6", "#EC4899", "#F59E0B", "#10B981", "#8B5CF6"];
 

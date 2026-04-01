@@ -9,7 +9,7 @@ import {
   FaChevronLeft, FaChevronRight, FaCalendarAlt, FaClock,
   FaCheckCircle, FaTimesCircle, FaHourglassHalf
 } from "react-icons/fa";
-import "../styles/Dashboard.css";
+import "../styles/dashboard.css";
 
 export default function SKKagawadDashboard() {
   const navigate = useNavigate();

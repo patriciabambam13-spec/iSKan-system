@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { supabase } from "../services/supabaseClient";
 import { useNavigate, Link } from "react-router-dom";
-import "../styles/Login.css";
+import "../styles/login.css";
 import { FaEye, FaEyeSlash } from "react-icons/fa";
 import toast from "react-hot-toast";
 
