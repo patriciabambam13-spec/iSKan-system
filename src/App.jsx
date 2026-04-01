@@ -11,6 +11,7 @@ import ManageYouth from "./pages/manageYouth";
 import Settings from "./pages/Settings";
 import GenerateReports from "./pages/GenerateReports";
 import AuditLogs from "./pages/AuditLogs"; 
+import ManualVerification from "./pages/ManualVerification";
 
 function App() {
   return (
@@ -27,6 +28,7 @@ function App() {
         <Route path="/create-programs" element={<CreatePrograms />} />
          <Route path="/audit-logs" element={<AuditLogs />} /> 
         <Route path="/manage-youth" element={<ManageYouth />} />
+        <Route path="/manual-verification" element={<ManualVerification />} />
         <Route path="/settings" element={<Settings />} />
       </Routes>
     </BrowserRouter>

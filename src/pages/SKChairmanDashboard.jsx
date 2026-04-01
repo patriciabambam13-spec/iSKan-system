@@ -210,7 +210,7 @@ export default function SKChairmanDashboard() {
   }, []);
 
   const handleOverride = () => {
-    navigate('/override-youth');
+    navigate('/manual-verification');
   };
 
   const menuItems = [
@@ -219,7 +219,7 @@ export default function SKChairmanDashboard() {
     { name: "Create Program", icon: FaPlusCircle, path: "/create-programs" },
     { name: "Generate Reports", icon: FaChartLine, path: "/generate-reports" },
     { name: "Audit Logs", icon: FaHistory, path: "/audit-logs" },
-    { name: "Override Youth", icon: FaExclamationTriangle, path: "/override-youth" },
+    { name: "Manual Verification Youth", icon: FaExclamationTriangle, path: "/manual-verification" },
   ];
 
   return (
@@ -276,7 +276,7 @@ export default function SKChairmanDashboard() {
             <div className="stat-card">
               <img src={icon_overrides} alt="Overrides Icon" className="stat-icon-placeholder" />
               <h2>{stats.overrides}</h2>
-              <p>Overrides Today</p>
+              <p>Manual Verification Today</p>
             </div>
 
             <div className="stat-card">
@@ -351,7 +351,7 @@ export default function SKChairmanDashboard() {
               </div>
 
               <div className="chart-card">
-                <h3>Monthly Overrides Trend</h3>
+                <h3>Monthly Manual Verification Trend</h3>
                 <div className="chart-wrapper">
                   <ResponsiveContainer width="100%" height={300}>
                     <LineChart data={chartData.monthlyOverrides}>
@@ -393,7 +393,7 @@ export default function SKChairmanDashboard() {
             
             <button onClick={handleOverride} className="action-btn">
               <img src={icon_overrides} alt="Override" className="action-icon" />
-              <span>Override</span>
+              <span>Manual Verification</span>
             </button>
             
             <button onClick={() => navigate('/audit-logs')} className="action-btn">
@@ -406,7 +406,7 @@ export default function SKChairmanDashboard() {
           {/* Recent Data */}
           <div className="bottom-section">
             <div className="info-card">
-              <h3>Recent Overrides</h3>
+              <h3>Recent Manual Verification</h3>
               <div className="info-list">
                 {recentOverrides.length > 0 ? (
                   recentOverrides.map((override, index) => (
@@ -417,11 +417,11 @@ export default function SKChairmanDashboard() {
                         </span>
                         <span className="info-program">{override.programs?.program_name}</span>
                       </div>
-                      <span className="badge urgent">Override</span>
+                      <span className="badge urgent">Manual Verification</span>
                     </div>
                   ))
                 ) : (
-                  <p className="no-data">No recent overrides</p>
+                  <p className="no-data">No recent Manual Verification</p>
                 )}
               </div>
             </div>

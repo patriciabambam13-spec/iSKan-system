@@ -26,12 +26,8 @@ export default function SKKagawadDashboard() {
   const [recentScans, setRecentScans] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    fetchStats();
-    fetchOngoingPrograms();
-    fetchRecentScans();
-  }, []);
-
+  // ========== FETCH FUNCTIONS ==========
+  
   const fetchStats = async () => {
     try {
       // Total youth
@@ -84,31 +80,37 @@ export default function SKKagawadDashboard() {
 
   const fetchOngoingPrograms = async () => {
     try {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("programs")
         .select(`
-          *,
-          transactions:transactions(
-            youth:youth_id(first_name, last_name),
+          program_name,
+          transactions!inner(
+            id,
             status,
             created_at,
-            method
+            method,
+            youth:youth_id(first_name, last_name)
           )
         `)
         .eq("status", "ongoing")
-        .limit(5);
+        .limit(10);
+
+      if (error) throw error;
 
       // Transform data for display
-      const formatted = data?.flatMap(program => 
-        program.transactions?.map(tx => ({
-          id: tx.id,
-          youthName: `${tx.youth?.first_name || ''} ${tx.youth?.last_name || ''}`.trim(),
-          programName: program.program_name,
-          time: format(new Date(tx.created_at), "hh:mm a"),
-          method: tx.method || "Manual",
-          status: tx.status
-        }))
-      ) || [];
+      const formatted = [];
+      data?.forEach(program => {
+        program.transactions?.forEach(tx => {
+          formatted.push({
+            id: tx.id,
+            youthName: `${tx.youth?.first_name || ''} ${tx.youth?.last_name || ''}`.trim(),
+            programName: program.program_name,
+            time: format(new Date(tx.created_at), "hh:mm a"),
+            method: tx.method || "Manual",
+            status: tx.status
+          });
+        });
+      });
 
       setOngoingPrograms(formatted);
     } catch (error) {
@@ -118,16 +120,21 @@ export default function SKKagawadDashboard() {
 
   const fetchRecentScans = async () => {
     try {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("transactions")
         .select(`
-          *,
+          id,
+          status,
+          created_at,
+          method,
           youth:youth_id(first_name, last_name),
           program:program_id(program_name)
         `)
         .eq("method", "QR Scan")
         .order("created_at", { ascending: false })
-        .limit(5);
+        .limit(10);
+
+      if (error) throw error;
 
       const formatted = data?.map(scan => ({
         id: scan.id,
@@ -139,13 +146,27 @@ export default function SKKagawadDashboard() {
       })) || [];
 
       setRecentScans(formatted);
-      setIsLoading(false);
     } catch (error) {
       console.error("Error fetching recent scans:", error);
-      setIsLoading(false);
     }
   };
 
+  // ========== LOAD DATA ==========
+  useEffect(() => {
+    const loadDashboard = async () => {
+      setIsLoading(true);
+      await Promise.all([
+        fetchStats(),
+        fetchOngoingPrograms(),
+        fetchRecentScans()
+      ]);
+      setIsLoading(false);
+    };
+    
+    loadDashboard();
+  }, []);
+
+  // ========== HELPER FUNCTIONS ==========
   const getStatusBadge = (status) => {
     switch(status?.toLowerCase()) {
       case 'approved':
@@ -159,6 +180,7 @@ export default function SKKagawadDashboard() {
     }
   };
 
+  // ========== MENU ITEMS ==========
   const menuItems = [
     { name: "Dashboard", icon: FaTachometerAlt, path: "/kagawad-dashboard" },
     { name: "Scan QR", icon: FaQrcode, path: "/scan" },
@@ -168,6 +190,7 @@ export default function SKKagawadDashboard() {
     { name: "Generate Report", icon: FaChartLine, path: "/generate-reports" },
   ];
 
+  // ========== RENDER ==========
   return (
     <>
       <Navbar />
@@ -317,8 +340,8 @@ export default function SKKagawadDashboard() {
                       {ongoingPrograms.length > 0 ? (
                         ongoingPrograms.map((program, index) => (
                           <tr key={index}>
-                            <td>{program.youthName}</td>
-                            <td>{program.programName}</td>
+                            <td>{program.youthName || "Unknown"}</td>
+                            <td>{program.programName || "-"}</td>
                             <td><FaClock className="inline-icon" /> {program.time}</td>
                             <td>{program.method}</td>
                             <td>{getStatusBadge(program.status)}</td>
@@ -354,8 +377,8 @@ export default function SKKagawadDashboard() {
                       {recentScans.length > 0 ? (
                         recentScans.map((scan, index) => (
                           <tr key={index}>
-                            <td>{scan.youthName}</td>
-                            <td>{scan.programName}</td>
+                            <td>{scan.youthName || "Unknown"}</td>
+                            <td>{scan.programName || "-"}</td>
                             <td><FaClock className="inline-icon" /> {scan.time}</td>
                             <td><FaQrcode className="inline-icon" /> {scan.method}</td>
                             <td>{getStatusBadge(scan.status)}</td>

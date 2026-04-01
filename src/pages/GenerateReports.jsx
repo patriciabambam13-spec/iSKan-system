@@ -7,7 +7,9 @@ import {
   PieChart, Pie, Cell, Legend
 } from "recharts";
 import { format } from "date-fns";
-import { FaFileCsv, FaCalendarAlt, FaChartBar, FaChartPie, FaFilter, FaUsers, FaCheckCircle, FaCalendarCheck, FaChartLine } from "react-icons/fa";
+import { FaFileCsv, FaChartBar, FaChartPie, FaFilter, FaUsers, FaCheckCircle, FaCalendarCheck, FaChartLine, FaPrint, FaFilePdf } from "react-icons/fa";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 import "../styles/generateReports.css";
 
 const CHART_COLORS = ["#3B82F6", "#EC4899", "#F59E0B", "#10B981", "#8B5CF6"];
@@ -140,6 +142,11 @@ export default function GenerateReports() {
   }, [fromDate, toDate, program]);
 
   const exportCSV = () => {
+    if (filteredYouths.length === 0) {
+      alert("No data to export");
+      return;
+    }
+
     const headers = ["Name", "Gender", "Age", "Contact", "Email", "Status", "Registration Date"];
     const rows = filteredYouths.map(y => [
       `${y.first_name || ''} ${y.last_name || ''}`.trim(),
@@ -174,13 +181,309 @@ export default function GenerateReports() {
     setReportType("summary");
   };
 
+  const handlePrint = () => {
+    if (filteredYouths.length === 0) {
+      alert("No data to print");
+      return;
+    }
+    window.print();
+  };
+
+  const getImageDataUrl = (imagePath) => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.crossOrigin = "Anonymous";
+      
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0);
+        const dataUrl = canvas.toDataURL("image/png");
+        resolve(dataUrl);
+      };
+      
+      img.onerror = () => {
+        console.log(`Image not found: ${imagePath}`);
+        resolve(null);
+      };
+      
+      img.src = `${imagePath}?t=${new Date().getTime()}`;
+    });
+  };
+
+  const exportPDF = async () => {
+    if (filteredYouths.length === 0) {
+      alert("No data to export");
+      return;
+    }
+
+    try {
+      const doc = new jsPDF();
+      let currentY = 20;
+
+      const qcLogo = await getImageDataUrl("/qc-logo.png");
+      const skLogo = await getImageDataUrl("/sk-logo.png");
+      const skLogo2 = await getImageDataUrl("/sk-logoo.png");
+
+      if (qcLogo) {
+        doc.addImage(qcLogo, "PNG", 15, currentY - 5, 25, 25);
+      }
+      if (skLogo) {
+        doc.addImage(skLogo, "PNG", 85, currentY - 5, 25, 25);
+      }
+      if (skLogo2) {
+        doc.addImage(skLogo2, "PNG", 155, currentY - 5, 25, 25);
+      }
+      
+      currentY += 25;
+
+      doc.setFontSize(8);
+      doc.setTextColor(100, 100, 100);
+      doc.text("Republic of the Philippines", 105, currentY, { align: "center" });
+      currentY += 5;
+      doc.setFontSize(12);
+      doc.setTextColor(0, 0, 0);
+      doc.setFont(undefined, "bold");
+      doc.text("Sangguniang Kabataan", 105, currentY, { align: "center" });
+      currentY += 7;
+      doc.setFontSize(14);
+      doc.setFont(undefined, "bold");
+      doc.text("Youth Participation Report", 105, currentY, { align: "center" });
+      currentY += 8;
+      doc.setFont(undefined, "normal");
+
+      doc.setFontSize(9);
+      doc.setTextColor(80, 80, 80);
+      doc.text(`Date Generated: ${format(new Date(), "MMMM dd, yyyy")}`, 105, currentY, { align: "center" });
+      currentY += 5;
+      doc.text(`Time: ${format(new Date(), "hh:mm:ss a")}`, 105, currentY, { align: "center" });
+      currentY += 12;
+
+      if (fromDate || toDate || program) {
+        doc.setFillColor(255, 248, 225);
+        doc.rect(14, currentY - 3, 182, 12, "F");
+        doc.setFontSize(9);
+        doc.setTextColor(0, 0, 0);
+        doc.setFont(undefined, "bold");
+        doc.text("Applied Filters:", 14, currentY);
+        doc.setFont(undefined, "normal");
+        doc.setTextColor(80, 80, 80);
+        let filterX = 60;
+        if (fromDate) {
+          doc.text(`From: ${fromDate}`, filterX, currentY);
+          filterX += 35;
+        }
+        if (toDate) {
+          doc.text(`To: ${toDate}`, filterX, currentY);
+          filterX += 35;
+        }
+        if (program) {
+          const programName = programs.find(p => p.id === program)?.program_name || program;
+          doc.text(`Program: ${programName}`, filterX, currentY);
+        }
+        currentY += 10;
+      }
+
+      doc.setDrawColor(242, 183, 5);
+      doc.setLineWidth(0.5);
+      doc.line(14, currentY, 196, currentY);
+      doc.setFontSize(12);
+      doc.setTextColor(0, 0, 0);
+      doc.setFont(undefined, "bold");
+      doc.text("EXECUTIVE SUMMARY", 14, currentY + 5);
+      currentY += 12;
+      
+      doc.setFillColor(255, 248, 225);
+      doc.rect(14, currentY - 2, 182, 28, "F");
+      
+      doc.setFontSize(10);
+      doc.setFont(undefined, "bold");
+      doc.setTextColor(0, 0, 0);
+      doc.text("Total Youth:", 20, currentY + 5);
+      doc.setFont(undefined, "normal");
+      doc.setFontSize(14);
+      doc.setTextColor(242, 183, 5);
+      doc.text(stats.total.toString(), 20, currentY + 12);
+      
+      doc.setFontSize(10);
+      doc.setFont(undefined, "bold");
+      doc.setTextColor(0, 0, 0);
+      doc.text("Active Youth:", 75, currentY + 5);
+      doc.setFont(undefined, "normal");
+      doc.setFontSize(14);
+      doc.setTextColor(242, 183, 5);
+      doc.text(stats.active.toString(), 75, currentY + 12);
+      
+      doc.setFontSize(10);
+      doc.setFont(undefined, "bold");
+      doc.setTextColor(0, 0, 0);
+      doc.text("Total Programs:", 130, currentY + 5);
+      doc.setFont(undefined, "normal");
+      doc.setFontSize(14);
+      doc.setTextColor(242, 183, 5);
+      doc.text(stats.programs.toString(), 130, currentY + 12);
+      
+      doc.setFontSize(10);
+      doc.setFont(undefined, "bold");
+      doc.setTextColor(0, 0, 0);
+      doc.text("Participation Rate:", 20, currentY + 20);
+      doc.setFont(undefined, "normal");
+      doc.setFontSize(14);
+      doc.setTextColor(242, 183, 5);
+      doc.text(`${stats.participation}%`, 20, currentY + 27);
+      
+      currentY += 38;
+
+      if (genderData.length > 0) {
+        doc.setDrawColor(242, 183, 5);
+        doc.line(14, currentY, 196, currentY);
+        doc.setFontSize(12);
+        doc.setFont(undefined, "bold");
+        doc.setTextColor(0, 0, 0);
+        doc.text("GENDER DISTRIBUTION", 14, currentY + 5);
+        currentY += 10;
+        
+        const genderTableData = genderData.map(g => [
+          g.name,
+          g.value,
+          `${Math.round((g.value / stats.total) * 100)}%`
+        ]);
+        
+        autoTable(doc, {
+          startY: currentY,
+          head: [["Gender", "Count", "Percentage"]],
+          body: genderTableData,
+          theme: "striped",
+          headStyles: { fillColor: [242, 183, 5], textColor: [0, 0, 0], fontStyle: "bold", halign: "center" },
+          bodyStyles: { fontSize: 9, halign: "center" },
+          alternateRowStyles: { fillColor: [255, 248, 225] },
+          margin: { left: 14, right: 14 }
+        });
+        
+        currentY = doc.lastAutoTable.finalY + 8;
+      }
+
+      if (monthlyData.length > 0) {
+        doc.setDrawColor(242, 183, 5);
+        doc.line(14, currentY, 196, currentY);
+        doc.setFontSize(12);
+        doc.setFont(undefined, "bold");
+        doc.text("MONTHLY PARTICIPATION TRENDS", 14, currentY + 5);
+        currentY += 10;
+        
+        const monthlyTableData = monthlyData.map(m => [m.name, m.value]);
+        
+        autoTable(doc, {
+          startY: currentY,
+          head: [["Month", "Number of Participants"]],
+          body: monthlyTableData,
+          theme: "striped",
+          headStyles: { fillColor: [242, 183, 5], textColor: [0, 0, 0], fontStyle: "bold", halign: "center" },
+          bodyStyles: { fontSize: 9, halign: "center" },
+          alternateRowStyles: { fillColor: [255, 248, 225] },
+          margin: { left: 14, right: 14 }
+        });
+        
+        currentY = doc.lastAutoTable.finalY + 8;
+      }
+
+      if (programData.length > 0) {
+        doc.setDrawColor(242, 183, 5);
+        doc.line(14, currentY, 196, currentY);
+        doc.setFontSize(12);
+        doc.setFont(undefined, "bold");
+        doc.text("PROGRAM PARTICIPATION", 14, currentY + 5);
+        currentY += 10;
+        
+        const programTableData = programData.map(p => [p.name, p.value]);
+        
+        autoTable(doc, {
+          startY: currentY,
+          head: [["Program Name", "Number of Participants"]],
+          body: programTableData,
+          theme: "striped",
+          headStyles: { fillColor: [242, 183, 5], textColor: [0, 0, 0], fontStyle: "bold", halign: "center" },
+          bodyStyles: { fontSize: 8, halign: "center" },
+          alternateRowStyles: { fillColor: [255, 248, 225] },
+          margin: { left: 14, right: 14 }
+        });
+        
+        currentY = doc.lastAutoTable.finalY + 8;
+      }
+
+      doc.setDrawColor(242, 183, 5);
+      doc.line(14, currentY, 196, currentY);
+      doc.setFontSize(12);
+      doc.setFont(undefined, "bold");
+      doc.text("YOUTH DIRECTORY", 14, currentY + 5);
+      currentY += 10;
+
+      const tableData = filteredYouths.map(y => [
+        `${y.first_name || ""} ${y.last_name || ""}`.trim() || "-",
+        y.gender || "-",
+        y.age || "-",
+        y.contact || "-",
+        y.status || "Active"
+      ]);
+
+      autoTable(doc, {
+        startY: currentY,
+        head: [["Name", "Gender", "Age", "Contact", "Status"]],
+        body: tableData,
+        theme: "striped",
+        headStyles: { fillColor: [242, 183, 5], textColor: [0, 0, 0], fontStyle: "bold", halign: "center" },
+        styles: { fontSize: 8, cellPadding: 3, halign: "center" },
+        alternateRowStyles: { fillColor: [255, 248, 225] },
+        margin: { left: 14, right: 14 }
+      });
+
+      const finalY = doc.lastAutoTable.finalY + 15;
+      doc.setDrawColor(242, 183, 5);
+      doc.line(14, finalY - 5, 196, finalY - 5);
+      
+      doc.setFontSize(9);
+      doc.setTextColor(0, 0, 0);
+      doc.setFont(undefined, "bold");
+      doc.text("Prepared by:", 14, finalY);
+      doc.setFont(undefined, "normal");
+      doc.text("_________________________", 14, finalY + 3);
+      doc.text("SK Secretary", 14, finalY + 7);
+      
+      doc.setFont(undefined, "bold");
+      doc.text("Noted by:", 105, finalY);
+      doc.setFont(undefined, "normal");
+      doc.text("_________________________", 105, finalY + 3);
+      doc.text("SK Chairperson", 105, finalY + 7);
+      
+      doc.setFontSize(8);
+      doc.setTextColor(100, 100, 100);
+      doc.text("Barangay Youth Development Office", 105, finalY + 15, { align: "center" });
+      doc.text(`Generated on: ${format(new Date(), "yyyy-MM-dd hh:mm:ss a")}`, 105, finalY + 20, { align: "center" });
+
+      const pageCount = doc.internal.getNumberOfPages();
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setFontSize(8);
+        doc.setTextColor(150, 150, 150);
+        doc.text(`Page ${i} of ${pageCount}`, 105, doc.internal.pageSize.height - 10, { align: "center" });
+      }
+
+      doc.save(`youth_report_${format(new Date(), "yyyy-MM-dd")}.pdf`);
+      
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+      alert("Error generating PDF. Please try again.");
+    }
+  };
+
   return (
     <>
       <Navbar />
       <div className="reports-container">
-        {/* Header Section */}
         <div className="page-header">
-          <button className="back-btn" onClick={() => navigate(-1)} aria-label="Go back">
+          <button className="back-btn" onClick={() => navigate(-1)}>
             ←
           </button>
           <div className="header-text">
@@ -189,7 +492,6 @@ export default function GenerateReports() {
           </div>
         </div>
 
-        {/* Filters Section - Simplified Single Row */}
         <div className="filter-section">
           <div className="filter-header">
             <FaFilter className="filter-icon" />
@@ -252,6 +554,12 @@ export default function GenerateReports() {
                 <button onClick={exportCSV} className="btn-primary">
                   <FaFileCsv /> Export CSV
                 </button>
+                <button onClick={exportPDF} className="btn-pdf">
+                  <FaFilePdf /> Download PDF
+                </button>
+                <button onClick={handlePrint} className="btn-secondary">
+                  <FaPrint /> Print Report
+                </button>
               </div>
             </div>
           </div>
@@ -264,7 +572,6 @@ export default function GenerateReports() {
           </div>
         ) : (
           <>
-            {/* Statistics Cards */}
             <div className="stats-grid">
               <div className="stat-card">
                 <div className="stat-icon">
@@ -307,7 +614,6 @@ export default function GenerateReports() {
               </div>
             </div>
 
-            {/* Charts Section - Side by Side */}
             <div className="charts-container">
               <div className="chart-card">
                 <div className="chart-header">
@@ -320,7 +626,7 @@ export default function GenerateReports() {
                       <XAxis dataKey="name" stroke="#888" fontSize={12} />
                       <YAxis stroke="#888" fontSize={12} />
                       <Tooltip />
-                      <Bar dataKey="value" fill="#3B82F6" radius={[8, 8, 0, 0]} />
+                      <Bar dataKey="value" fill="#F2B705" radius={[8, 8, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
@@ -356,7 +662,6 @@ export default function GenerateReports() {
               </div>
             </div>
 
-            {/* Program Participation Chart */}
             {programData.length > 0 && (
               <div className="chart-card full-width">
                 <div className="chart-header">
@@ -369,14 +674,13 @@ export default function GenerateReports() {
                       <XAxis type="number" stroke="#888" fontSize={12} />
                       <YAxis type="category" dataKey="name" stroke="#888" fontSize={12} width={150} />
                       <Tooltip />
-                      <Bar dataKey="value" fill="#F59E0B" radius={[0, 8, 8, 0]} />
+                      <Bar dataKey="value" fill="#F2B705" radius={[0, 8, 8, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
               </div>
             )}
 
-            {/* Detailed Report Table */}
             {reportType === "detailed" && filteredYouths.length > 0 && (
               <div className="detailed-report">
                 <div className="detailed-header">
@@ -425,6 +729,172 @@ export default function GenerateReports() {
             )}
           </>
         )}
+      </div>
+
+      <div className="print-area">
+        <div className="print-header">
+          <div className="print-logos">
+            <img src="/qc-logo.png" alt="QC Logo" className="print-logo" />
+            <img src="/sk-logo.png" alt="SK Logo" className="print-logo" />
+            <img src="/sk-logoo.png" alt="SK Logo 2" className="print-logo" />
+          </div>
+          <div className="print-title">
+            <h2>Republic of the Philippines</h2>
+            <h3>Sangguniang Kabataan</h3>
+            <h4>Youth Participation Report</h4>
+          </div>
+          <div className="print-date">
+            <p>Date Generated: {format(new Date(), "MMMM dd, yyyy")}</p>
+            <p>Time: {format(new Date(), "hh:mm:ss a")}</p>
+          </div>
+        </div>
+        
+        <div className="print-stats">
+          <div className="print-stat-item">
+            <strong>Total Youth:</strong> {stats.total}
+          </div>
+          <div className="print-stat-item">
+            <strong>Active Youth:</strong> {stats.active}
+          </div>
+          <div className="print-stat-item">
+            <strong>Total Programs:</strong> {stats.programs}
+          </div>
+          <div className="print-stat-item">
+            <strong>Participation Rate:</strong> {stats.participation}%
+          </div>
+        </div>
+
+        {(fromDate || toDate || program) && (
+          <div className="print-filters">
+            <h4>Applied Filters</h4>
+            <ul>
+              {fromDate && <li>From Date: {fromDate}</li>}
+              {toDate && <li>To Date: {toDate}</li>}
+              {program && <li>Program: {programs.find(p => p.id === program)?.program_name || program}</li>}
+            </ul>
+          </div>
+        )}
+
+        <div className="print-section">
+          <h4>Executive Summary</h4>
+          <div className="print-summary-stats">
+            <div>Total Youth: <strong>{stats.total}</strong></div>
+            <div>Active Youth: <strong>{stats.active}</strong></div>
+            <div>Total Programs: <strong>{stats.programs}</strong></div>
+            <div>Participation Rate: <strong>{stats.participation}%</strong></div>
+          </div>
+        </div>
+
+        {genderData.length > 0 && (
+          <div className="print-section">
+            <h4>Gender Distribution</h4>
+            <table className="print-table">
+              <thead>
+                <tr>
+                  <th>Gender</th>
+                  <th>Count</th>
+                  <th>Percentage</th>
+                </tr>
+              </thead>
+              <tbody>
+                {genderData.map((g, i) => (
+                  <tr key={i}>
+                    <td>{g.name}</td>
+                    <td>{g.value}</td>
+                    <td>{Math.round((g.value / stats.total) * 100)}%</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {monthlyData.length > 0 && (
+          <div className="print-section">
+            <h4>Monthly Participation Trends</h4>
+            <table className="print-table">
+              <thead>
+                <tr>
+                  <th>Month</th>
+                  <th>Number of Participants</th>
+                </tr>
+              </thead>
+              <tbody>
+                {monthlyData.map((m, i) => (
+                  <tr key={i}>
+                    <td>{m.name}</td>
+                    <td>{m.value}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {programData.length > 0 && (
+          <div className="print-section">
+            <h4>Program Participation Overview</h4>
+            <table className="print-table">
+              <thead>
+                <tr>
+                  <th>Program Name</th>
+                  <th>Number of Participants</th>
+                </tr>
+              </thead>
+              <tbody>
+                {programData.map((p, i) => (
+                  <tr key={i}>
+                    <td>{p.name}</td>
+                    <td>{p.value}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        <div className="print-section">
+          <h4>Youth Directory</h4>
+          <table className="print-table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Gender</th>
+                <th>Age</th>
+                <th>Contact</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredYouths.map((y, i) => (
+                <tr key={i}>
+                  <td>{`${y.first_name || ''} ${y.last_name || ''}`.trim()}</td>
+                  <td>{y.gender || "-"}</td>
+                  <td>{y.age || "-"}</td>
+                  <td>{y.contact || "-"}</td>
+                  <td>{y.status || "Active"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="print-footer">
+          <div className="print-signatures">
+            <div className="signature-line">
+              <p>_________________________</p>
+              <p><strong>SK Secretary</strong></p>
+            </div>
+            <div className="signature-line">
+              <p>_________________________</p>
+              <p><strong>SK Chairperson</strong></p>
+            </div>
+          </div>
+          <div className="print-footer-text">
+            <p>Barangay Youth Development Office</p>
+            <p>Generated on: {format(new Date(), "yyyy-MM-dd hh:mm:ss a")}</p>
+          </div>
+        </div>
       </div>
     </>
   );

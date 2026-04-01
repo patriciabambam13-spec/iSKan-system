@@ -3,30 +3,30 @@ import { useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import { supabase } from "../services/supabaseClient";
 import { format } from "date-fns";
-import { 
-  FaSearch, FaFilter, FaDownload, FaCalendarAlt, 
+import {
+  FaSearch, FaFilter, FaDownload, FaCalendarAlt,
   FaUser, FaClock, FaDatabase, FaExclamationTriangle,
-  FaChevronLeft, FaChevronRight, FaEye, FaSync
+  FaChevronLeft, FaChevronRight, FaSync
 } from "react-icons/fa";
 import "../styles/auditLogs.css";
 
 export default function AuditLogs() {
   const navigate = useNavigate();
+
   const [logs, setLogs] = useState([]);
   const [filteredLogs, setFilteredLogs] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  
+
   // Filters
   const [searchTerm, setSearchTerm] = useState("");
   const [actionType, setActionType] = useState("");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
-  const [userFilter, setUserFilter] = useState("");
-  
+
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(10);
-  
+  const itemsPerPage = 10;
+
   // Stats
   const [stats, setStats] = useState({
     total: 0,
@@ -35,10 +35,7 @@ export default function AuditLogs() {
     uniqueUsers: 0
   });
 
-  useEffect(() => {
-    fetchAuditLogs();
-  }, []);
-
+  // 🔥 FETCH DATA FROM SUPABASE
   const fetchAuditLogs = async () => {
     setIsLoading(true);
     try {
@@ -46,121 +43,126 @@ export default function AuditLogs() {
         .from("audit_logs")
         .select(`
           *,
-          users:user_id(email, role)
+          users:user_id(email)
         `)
         .order("created_at", { ascending: false });
 
       if (error) throw error;
 
-      setLogs(data || []);
-      setFilteredLogs(data || []);
-      
-      // Calculate stats
-      const today = new Date().toISOString().split('T')[0];
+      const logsData = data || [];
+      setLogs(logsData);
+      setFilteredLogs(logsData);
+
+      // 📊 Stats
+      const today = format(new Date(), "yyyy-MM-dd");
+
+      const todayLogs = logsData.filter(
+        l => l.created_at?.startsWith(today)
+      );
+
       const weekAgo = new Date();
       weekAgo.setDate(weekAgo.getDate() - 7);
-      
-      const todayLogs = data?.filter(log => log.created_at?.split('T')[0] === today) || [];
-      const weekLogs = data?.filter(log => new Date(log.created_at) >= weekAgo) || [];
-      const uniqueUsers = new Set(data?.map(log => log.user_id)).size;
-      
+
+      const weekLogs = logsData.filter(
+        l => new Date(l.created_at) >= weekAgo
+      );
+
+      const uniqueUsers = new Set(logsData.map(l => l.user_id)).size;
+
       setStats({
-        total: data?.length || 0,
+        total: logsData.length,
         today: todayLogs.length,
         thisWeek: weekLogs.length,
-        uniqueUsers: uniqueUsers
+        uniqueUsers
       });
-      
+
     } catch (error) {
-      console.error("Error fetching audit logs:", error);
+      console.error("Fetch error:", error.message);
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Apply filters
+  useEffect(() => {
+    fetchAuditLogs();
+  }, []);
+
+  // 🔍 FILTERING LOGIC
   useEffect(() => {
     let filtered = [...logs];
-    
-    // Search filter
+
     if (searchTerm) {
-      filtered = filtered.filter(log => 
-        log.action?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        log.table_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        log.record_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        log.details?.toLowerCase().includes(searchTerm.toLowerCase())
+      filtered = filtered.filter(log =>
+        (log.action || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (log.table_name || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (log.record_id || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (log.details || "").toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
-    
-    // Action type filter
+
     if (actionType) {
       filtered = filtered.filter(log => log.action === actionType);
     }
-    
-    // Date range filter
+
     if (fromDate) {
-      filtered = filtered.filter(log => log.created_at?.split('T')[0] >= fromDate);
+      filtered = filtered.filter(
+        log => log.created_at?.slice(0, 10) >= fromDate
+      );
     }
+
     if (toDate) {
-      filtered = filtered.filter(log => log.created_at?.split('T')[0] <= toDate);
+      filtered = filtered.filter(
+        log => log.created_at?.slice(0, 10) <= toDate
+      );
     }
-    
-    // User filter
-    if (userFilter) {
-      filtered = filtered.filter(log => log.user_id === userFilter);
-    }
-    
+
     setFilteredLogs(filtered);
     setCurrentPage(1);
-  }, [searchTerm, actionType, fromDate, toDate, userFilter, logs]);
+  }, [searchTerm, actionType, fromDate, toDate, logs]);
 
-  // Pagination
-  const indexOfLastItem = currentPage * itemsPerPage;
-  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentLogs = filteredLogs.slice(indexOfFirstItem, indexOfLastItem);
+  // 📄 PAGINATION
   const totalPages = Math.ceil(filteredLogs.length / itemsPerPage);
+  const currentLogs = filteredLogs.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
 
+  // 🎨 BADGE
   const getActionBadge = (action) => {
-    switch(action) {
-      case 'CREATE':
-        return <span className="badge-action create">CREATE</span>;
-      case 'UPDATE':
-        return <span className="badge-action update">UPDATE</span>;
-      case 'DELETE':
-        return <span className="badge-action delete">DELETE</span>;
-      case 'OVERRIDE':
-        return <span className="badge-action override">OVERRIDE</span>;
-      default:
-        return <span className="badge-action default">{action}</span>;
-    }
+    return <span className={`badge-action ${action?.toLowerCase()}`}>{action}</span>;
   };
 
+  // 📥 EXPORT CSV
   const exportToCSV = () => {
-    const headers = ["Timestamp", "User", "Action", "Table", "Record ID", "Details", "IP Address"];
+    if (filteredLogs.length === 0) {
+      alert("No data to export");
+      return;
+    }
+
+    const headers = ["Timestamp", "User", "Action", "Table", "Record ID", "Details"];
+
     const rows = filteredLogs.map(log => [
-      format(new Date(log.created_at), "yyyy-MM-dd HH:mm:ss"),
+      log.created_at ? format(new Date(log.created_at), "yyyy-MM-dd HH:mm:ss") : "",
       log.users?.email || "Unknown",
       log.action || "",
       log.table_name || "",
       log.record_id || "",
-      log.details || "",
-      log.ip_address || ""
+      log.details || ""
     ]);
 
-    let csvContent = headers.join(",") + "\n";
+    let csv = headers.join(",") + "\n";
+
     rows.forEach(row => {
-      csvContent += row.map(cell => `"${cell || ''}"`).join(",") + "\n";
+      csv += row.map(cell => `"${cell}"`).join(",") + "\n";
     });
 
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const blob = new Blob([csv], { type: "text/csv" });
     const link = document.createElement("a");
-    const url = URL.createObjectURL(blob);
-    link.href = url;
-    link.setAttribute("download", `audit_logs_${format(new Date(), "yyyy-MM-dd")}.csv`);
-    document.body.appendChild(link);
+
+    link.href = URL.createObjectURL(blob);
+    link.download = `audit_logs_${format(new Date(), "yyyy-MM-dd")}.csv`;
+
     link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
   };
 
   const clearFilters = () => {
@@ -168,225 +170,124 @@ export default function AuditLogs() {
     setActionType("");
     setFromDate("");
     setToDate("");
-    setUserFilter("");
   };
 
   return (
     <>
       <Navbar />
+
       <div className="audit-container">
-        {/* Header */}
+        {/* HEADER */}
         <div className="audit-header">
-          <button className="back-btn" onClick={() => navigate(-1)}>
-            ←
-          </button>
-          <div className="header-text">
-            <h2>Audit Logs</h2>
-            <p>Track all system activities and user actions</p>
-          </div>
-          <button className="refresh-btn" onClick={fetchAuditLogs}>
+          <button onClick={() => navigate(-1)}>←</button>
+          <h2>Audit Logs</h2>
+          <button onClick={fetchAuditLogs}>
             <FaSync /> Refresh
           </button>
         </div>
 
-        {/* Stats Cards */}
+        {/* STATS */}
         <div className="audit-stats-grid">
           <div className="stat-card">
-            <div className="stat-icon blue">
-              <FaDatabase />
-            </div>
-            <div className="stat-info">
-              <h3>{stats.total}</h3>
-              <p>Total Events</p>
-            </div>
+            <FaDatabase /> {stats.total} Total
           </div>
-
           <div className="stat-card">
-            <div className="stat-icon green">
-              <FaCalendarAlt />
-            </div>
-            <div className="stat-info">
-              <h3>{stats.today}</h3>
-              <p>Today</p>
-            </div>
+            <FaCalendarAlt /> {stats.today} Today
           </div>
-
           <div className="stat-card">
-            <div className="stat-icon orange">
-              <FaClock />
-            </div>
-            <div className="stat-info">
-              <h3>{stats.thisWeek}</h3>
-              <p>This Week</p>
-            </div>
+            <FaClock /> {stats.thisWeek} Week
           </div>
-
           <div className="stat-card">
-            <div className="stat-icon purple">
-              <FaUser />
-            </div>
-            <div className="stat-info">
-              <h3>{stats.uniqueUsers}</h3>
-              <p>Active Users</p>
-            </div>
+            <FaUser /> {stats.uniqueUsers} Users
           </div>
         </div>
 
-        {/* Filters */}
+        {/* FILTERS */}
         <div className="filters-section">
-          <div className="filters-header">
-            <FaFilter className="filter-icon" />
-            <span>Filter Logs</span>
-          </div>
-          
-          <div className="filters-row">
-            <div className="filter-group">
-              <label>Search</label>
-              <div className="search-wrapper">
-                <FaSearch className="search-icon" />
-                <input
-                  type="text"
-                  placeholder="Search actions, tables, records..."
-                  value={searchTerm}
-                  onChange={e => setSearchTerm(e.target.value)}
-                  className="filter-input"
-                />
-              </div>
-            </div>
+          <input
+            placeholder="Search..."
+            value={searchTerm}
+            onChange={e => setSearchTerm(e.target.value)}
+          />
 
-            <div className="filter-group">
-              <label>Action Type</label>
-              <select 
-                value={actionType}
-                onChange={e => setActionType(e.target.value)}
-                className="filter-select"
-              >
-                <option value="">All Actions</option>
-                <option value="CREATE">CREATE</option>
-                <option value="UPDATE">UPDATE</option>
-                <option value="DELETE">DELETE</option>
-                <option value="OVERRIDE">OVERRIDE</option>
-              </select>
-            </div>
+          <select value={actionType} onChange={e => setActionType(e.target.value)}>
+            <option value="">All</option>
+            <option value="CREATE">CREATE</option>
+            <option value="UPDATE">UPDATE</option>
+            <option value="DELETE">DELETE</option>
+          </select>
 
-            <div className="filter-group">
-              <label>From Date</label>
-              <input
-                type="date"
-                value={fromDate}
-                onChange={e => setFromDate(e.target.value)}
-                className="filter-input"
-              />
-            </div>
+          <input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} />
+          <input type="date" value={toDate} onChange={e => setToDate(e.target.value)} />
 
-            <div className="filter-group">
-              <label>To Date</label>
-              <input
-                type="date"
-                value={toDate}
-                onChange={e => setToDate(e.target.value)}
-                className="filter-input"
-              />
-            </div>
-
-            <div className="filter-actions">
-              <button onClick={clearFilters} className="btn-outline">
-                Clear
-              </button>
-              <button onClick={exportToCSV} className="btn-primary">
-                <FaDownload /> Export
-              </button>
-            </div>
-          </div>
+          <button onClick={clearFilters}>Clear</button>
+          <button onClick={exportToCSV}>
+            <FaDownload /> Export
+          </button>
         </div>
 
-        {/* Logs Table */}
+        {/* TABLE */}
         {isLoading ? (
-          <div className="loading-state">
-            <div className="spinner"></div>
-            <p>Loading audit logs...</p>
-          </div>
+          <p>Loading...</p>
         ) : (
-          <>
-            <div className="logs-table-container">
-              <table className="logs-table">
-                <thead>
-                  <tr>
-                    <th>Timestamp</th>
-                    <th>User</th>
-                    <th>Action</th>
-                    <th>Table</th>
-                    <th>Record ID</th>
-                    <th>Details</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {currentLogs.length > 0 ? (
-                    currentLogs.map((log, index) => (
-                      <tr key={index}>
-                        <td className="timestamp">
-                          {log.created_at ? format(new Date(log.created_at), "MMM dd, yyyy HH:mm:ss") : "-"}
-                        </td>
-                        <td>
-                          <div className="user-info">
-                            <FaUser className="user-icon" />
-                            <span>{log.users?.email?.split('@')[0] || "Unknown"}</span>
-                          </div>
-                        </td>
-                        <td>{getActionBadge(log.action)}</td>
-                        <td>
-                          <span className="table-name">{log.table_name || "-"}</span>
-                        </td>
-                        <td>
-                          <code className="record-id">{log.record_id || "-"}</code>
-                        </td>
-                        <td className="details-cell">
-                          <div className="details-preview">
-                            {log.details ? (
-                              <>
-                                <span>{log.details.substring(0, 50)}</span>
-                                {log.details.length > 50 && <span>...</span>}
-                              </>
-                            ) : "-"}
-                          </div>
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan="6" className="empty-state">
-                        <FaExclamationTriangle />
-                        <p>No audit logs found</p>
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
+          <table className="logs-table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>User</th>
+                <th>Action</th>
+                <th>Table</th>
+                <th>ID</th>
+                <th>Details</th>
+              </tr>
+            </thead>
 
-            {/* Pagination */}
-            {filteredLogs.length > 0 && (
-              <div className="pagination">
-                <button
-                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                  disabled={currentPage === 1}
-                  className="page-btn"
-                >
-                  <FaChevronLeft />
-                </button>
-                <span className="page-info">
-                  Page {currentPage} of {totalPages}
-                </span>
-                <button
-                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                  disabled={currentPage === totalPages}
-                  className="page-btn"
-                >
-                  <FaChevronRight />
-                </button>
-              </div>
-            )}
-          </>
+            <tbody>
+              {currentLogs.length > 0 ? (
+                currentLogs.map((log, i) => (
+                  <tr key={i}>
+                    <td>
+                      {log.created_at
+                        ? format(new Date(log.created_at), "MMM dd, yyyy HH:mm")
+                        : "-"}
+                    </td>
+                    <td>{log.users?.email || "Unknown"}</td>
+                    <td>{getActionBadge(log.action)}</td>
+                    <td>{log.table_name}</td>
+                    <td>{log.record_id}</td>
+                    <td>{log.details}</td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan="6">
+                    <FaExclamationTriangle /> No logs found
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        )}
+
+        {/* PAGINATION */}
+        {totalPages > 1 && (
+          <div className="pagination">
+            <button
+              disabled={currentPage === 1}
+              onClick={() => setCurrentPage(p => p - 1)}
+            >
+              <FaChevronLeft />
+            </button>
+
+            <span>{currentPage} / {totalPages}</span>
+
+            <button
+              disabled={currentPage === totalPages}
+              onClick={() => setCurrentPage(p => p + 1)}
+            >
+              <FaChevronRight />
+            </button>
+          </div>
         )}
       </div>
     </>
