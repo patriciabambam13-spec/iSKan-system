@@ -55,8 +55,6 @@ export default function Navbar() {
     return null;
   }
 
-  // Notice we wrap the whole return in empty tags <> ... </> 
-  // because React requires a single parent element when returning siblings
   return (
     <>
       <div className="navbar">
