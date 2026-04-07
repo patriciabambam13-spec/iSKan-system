@@ -57,8 +57,8 @@ export default function SKKagawadDashboard() {
           return;
         }
 
-        // Check if role is Kagawad (role_id = 2)
-        if (userData.role_id !== 2) {
+        // Check if role is Chairman (role_id = 1)
+        if (userData.role_id !== 1) {
           navigate("/unauthorized");
           return;
         }
