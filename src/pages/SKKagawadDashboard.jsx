@@ -14,6 +14,7 @@ import "../styles/dashboard.css";
 export default function SKKagawadDashboard() {
   const navigate = useNavigate();
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isAuthorized, setIsAuthorized] = useState(false);
   const [stats, setStats] = useState({
     youth: 0,
     upcomingPrograms: 0,
@@ -25,6 +26,45 @@ export default function SKKagawadDashboard() {
   const [ongoingPrograms, setOngoingPrograms] = useState([]);
   const [recentScans, setRecentScans] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+
+ // ========== ROLE PROTECTION ==========
+  useEffect(() => {
+    const checkAccess = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        
+        if (!user) {
+          navigate("/login");
+          return;
+        }
+
+        const { data: userData, error } = await supabase
+          .from("users")
+          .select("role_id")
+          .eq("user_id", user.id)
+          .single();
+
+        if (error || !userData) {
+          console.error("Error fetching user role:", error);
+          navigate("/login");
+          return;
+        }
+
+        // Check if role is Kagawad (role_id = 2)
+        if (userData.role_id !== 2) {
+          navigate("/unauthorized");
+          return;
+        }
+
+        setIsAuthorized(true);
+      } catch (error) {
+        console.error("Auth check error:", error);
+        navigate("/login");
+      }
+    };
+
+    checkAccess();
+  }, [navigate]);
 
   // ========== FETCH FUNCTIONS ==========
   
