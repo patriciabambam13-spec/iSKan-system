@@ -1,260 +1,232 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import { supabase } from "../services/supabaseClient";
-import { format } from "date-fns";
+import { useNavigate } from 'react-router-dom';
+import {
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
+  LineChart, Line, PieChart, Pie, Cell, Legend, AreaChart, Area
+} from "recharts";
+import { format, subDays, startOfMonth } from "date-fns";
 import { 
-  FaTachometerAlt, FaUsers, FaPlusCircle, FaQrcode, 
-  FaList, FaExchangeAlt, FaChartLine, FaExclamationTriangle,
-  FaChevronLeft, FaChevronRight, FaCalendarAlt, FaClock,
-  FaCheckCircle, FaTimesCircle, FaHourglassHalf
+  FaTachometerAlt, FaUsers, FaPlusCircle, FaChartLine, 
+  FaHistory, FaExclamationTriangle, FaChevronLeft, FaChevronRight 
 } from "react-icons/fa";
-import "../styles/SKKagawad.css";
-
-// Use the SAME images that Chairman dashboard uses (these should exist)
 import icon_youth from "../assets/totalyouth_ca.png";
 import icon_programs from "../assets/activeprograms_ca.png";
 import icon_transactions from "../assets/transactions_ca.png";
 import icon_overrides from "../assets/overrides_ca.png";
 import icon_benefeciaries from "../assets/beneficiaries_ca.png";
+import icon_createprogram from "../assets/create_qa.png";
+import icon_manageyouth from "../assets/manageyouth_qa.png";
+import icon_report from "../assets/report_qa.png";
+import icon_audit from "../assets/audit_qa.png";
+import "../styles/dashboard.css";
 
-export default function SKKagawadDashboard() {
+const CHART_COLORS = ["#3B82F6", "#EC4899", "#F59E0B", "#10B981", "#8B5CF6", "#06B6D4"];
+
+export default function SKChairmanDashboard() {
   const navigate = useNavigate();
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [isAuthorized, setIsAuthorized] = useState(false);
   const [stats, setStats] = useState({
     youth: 0,
-    upcomingPrograms: 0,
-    pendingTransactions: 0,
-    overdueEquipment: 0,
+    programs: 0,
+    transactions: 0,
+    overrides: 0,
     beneficiaries: 0
   });
 
-  const [ongoingPrograms, setOngoingPrograms] = useState([]);
-  const [recentScans, setRecentScans] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [chartData, setChartData] = useState({
+    registrationTrend: [],
+    genderDistribution: [],
+    programDistribution: [],
+    monthlyOverrides: []
+  });
 
-  // ========== ROLE PROTECTION ==========
-  useEffect(() => {
-    const checkAccess = async () => {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        
-        if (!user) {
-          navigate("/login");
-          return;
-        }
+  const [recentOverrides, setRecentOverrides] = useState([]);
+  const [activePrograms, setActivePrograms] = useState([]);
 
-        const { data: userData, error } = await supabase
-          .from("users")
-          .select("role_id")
-          .eq("user_id", user.id)
-          .single();
-
-        if (error || !userData) {
-          console.error("Error fetching user role:", error);
-          navigate("/login");
-          return;
-        }
-
-        // Check if role is Chairman (role_id = 1)
-        if (userData.role_id !== 1) {
-          navigate("/unauthorized");
-          return;
-        }
-
-        setIsAuthorized(true);
-      } catch (error) {
-        console.error("Auth check error:", error);
-        navigate("/login");
-      }
-    };
-
-    checkAccess();
-  }, [navigate]);
-
-  // ========== FETCH FUNCTIONS ==========
-  
+  // Fetch stats
   const fetchStats = async () => {
     try {
-      // Total youth
       const { count: youthCount } = await supabase
         .from("youth")
         .select("*", { count: "exact", head: true });
 
-      // Upcoming programs (start_date >= today)
-      const today = new Date().toISOString().split('T')[0];
-      const { count: upcomingCount } = await supabase
+      const { count: programCount } = await supabase
         .from("programs")
-        .select("*", { count: "exact", head: true })
-        .gte("start_date", today);
+        .select("*", { count: "exact", head: true });
 
-      // Pending transactions
-      const { count: pendingCount } = await supabase
-        .from("transactions")
+      const today = new Date().toISOString().split('T')[0];
+      const { count: overrideCount } = await supabase
+        .from("overrides")
         .select("*", { count: "exact", head: true })
-        .eq("status", "pending");
+        .gte("created_at", today);
 
-      // Overdue equipment
-      const { count: overdueCount } = await supabase
-        .from("equipment")
-        .select("*", { count: "exact", head: true })
-        .lt("due_date", today)
-        .eq("status", "borrowed");
-
-      // Beneficiaries this month
-      const startOfMonth = new Date();
-      startOfMonth.setDate(1);
       const { data: beneficiaries } = await supabase
         .from("transactions")
         .select("youth_id")
-        .gte("created_at", startOfMonth.toISOString());
+        .gte("created_at", startOfMonth(new Date()).toISOString());
 
       const uniqueBeneficiaries = new Set(beneficiaries?.map(b => b.youth_id) || []);
 
       setStats({
         youth: youthCount || 0,
-        upcomingPrograms: upcomingCount || 0,
-        pendingTransactions: pendingCount || 0,
-        overdueEquipment: overdueCount || 0,
+        programs: programCount || 0,
+        transactions: 35,
+        overrides: overrideCount || 0,
         beneficiaries: uniqueBeneficiaries.size
       });
 
     } catch (error) {
-      console.error("Error fetching stats:", error);
+      console.error("Dashboard fetch error:", error);
     }
   };
 
-  const fetchOngoingPrograms = async () => {
+  // Fetch chart data
+  const fetchChartData = async () => {
     try {
-      const { data, error } = await supabase
-        .from("programs")
-        .select(`
-          program_name,
-          transactions!inner(
-            id,
-            status,
-            created_at,
-            method,
-            youth:youth_id(first_name, last_name)
-          )
-        `)
-        .eq("status", "ongoing")
-        .limit(10);
+      const { data: registrations } = await supabase
+        .from("youth")
+        .select("created_at")
+        .gte("created_at", subDays(new Date(), 180).toISOString());
 
-      if (error) throw error;
-
-      // Transform data for display
-      const formatted = [];
-      data?.forEach(program => {
-        program.transactions?.forEach(tx => {
-          formatted.push({
-            id: tx.id,
-            youthName: `${tx.youth?.first_name || ''} ${tx.youth?.last_name || ''}`.trim(),
-            programName: program.program_name,
-            time: format(new Date(tx.created_at), "hh:mm a"),
-            method: tx.method || "Manual",
-            status: tx.status
-          });
-        });
+      const monthlyReg = {};
+      registrations?.forEach(reg => {
+        const month = format(new Date(reg.created_at), "MMM");
+        monthlyReg[month] = (monthlyReg[month] || 0) + 1;
       });
 
-      setOngoingPrograms(formatted);
+      const monthOrder = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+      const registrationTrend = monthOrder
+        .filter(m => monthlyReg[m])
+        .map(m => ({ month: m, count: monthlyReg[m] }));
+
+      const { data: genderData } = await supabase
+        .from("youth")
+        .select("gender");
+
+      const genderDist = { Male: 0, Female: 0, Other: 0 };
+      genderData?.forEach(y => {
+        if (y.gender === "Male") genderDist.Male++;
+        else if (y.gender === "Female") genderDist.Female++;
+        else genderDist.Other++;
+      });
+
+      const genderDistribution = [
+        { name: "Male", value: genderDist.Male },
+        { name: "Female", value: genderDist.Female },
+        { name: "Other", value: genderDist.Other }
+      ].filter(g => g.value > 0);
+
+      const { data: youthPrograms } = await supabase
+        .from("youth")
+        .select("program_id, programs(program_name)");
+
+      const programDist = {};
+      youthPrograms?.forEach(y => {
+        if (y.program_id) {
+          const progName = y.programs?.program_name || "Unknown";
+          programDist[progName] = (programDist[progName] || 0) + 1;
+        }
+      });
+
+      const programDistribution = Object.entries(programDist)
+        .map(([name, value]) => ({ name, value }))
+        .sort((a, b) => b.value - a.value)
+        .slice(0, 5);
+
+      const { data: overrides } = await supabase
+        .from("overrides")
+        .select("created_at")
+        .gte("created_at", subDays(new Date(), 90).toISOString());
+
+      const monthlyOver = {};
+      overrides?.forEach(ov => {
+        const month = format(new Date(ov.created_at), "MMM");
+        monthlyOver[month] = (monthlyOver[month] || 0) + 1;
+      });
+
+      const monthlyOverrides = monthOrder
+        .filter(m => monthlyOver[m])
+        .map(m => ({ month: m, count: monthlyOver[m] }));
+
+      setChartData({
+        registrationTrend,
+        genderDistribution,
+        programDistribution,
+        monthlyOverrides
+      });
+
     } catch (error) {
-      console.error("Error fetching ongoing programs:", error);
+      console.error("Error fetching chart data:", error);
     }
   };
 
-  const fetchRecentScans = async () => {
+  // Fetch recent overrides
+  const fetchRecentOverrides = async () => {
     try {
-      const { data, error } = await supabase
-        .from("transactions")
+      const { data } = await supabase
+        .from("overrides")
         .select(`
-          id,
-          status,
-          created_at,
-          method,
+          *,
           youth:youth_id(first_name, last_name),
-          program:program_id(program_name)
+          programs:program_id(program_name)
         `)
-        .eq("method", "QR Scan")
         .order("created_at", { ascending: false })
-        .limit(10);
+        .limit(5);
 
-      if (error) throw error;
-
-      const formatted = data?.map(scan => ({
-        id: scan.id,
-        youthName: `${scan.youth?.first_name || ''} ${scan.youth?.last_name || ''}`.trim(),
-        programName: scan.program?.program_name,
-        time: format(new Date(scan.created_at), "hh:mm a"),
-        method: scan.method,
-        status: scan.status
-      })) || [];
-
-      setRecentScans(formatted);
+      setRecentOverrides(data || []);
     } catch (error) {
-      console.error("Error fetching recent scans:", error);
+      console.error("Error fetching overrides:", error);
     }
   };
 
-  // ========== LOAD DATA ==========
+  // Fetch active programs
+  const fetchActivePrograms = async () => {
+    try {
+      const { data } = await supabase
+        .from("programs")
+        .select("*")
+        .eq("status", "Active")
+        .limit(5);
+
+      setActivePrograms(data || []);
+    } catch (error) {
+      console.error("Error fetching programs:", error);
+    }
+  };
+
+  // Load all data
   useEffect(() => {
-    if (isAuthorized) {
-      const loadDashboard = async () => {
-        setIsLoading(true);
-        await Promise.all([
-          fetchStats(),
-          fetchOngoingPrograms(),
-          fetchRecentScans()
-        ]);
-        setIsLoading(false);
-      };
-      
-      loadDashboard();
-    }
-  }, [isAuthorized]);
+    const loadDashboard = async () => {
+      await Promise.all([
+        fetchStats(),
+        fetchChartData(),
+        fetchRecentOverrides(),
+        fetchActivePrograms()
+      ]);
+    };
+    loadDashboard();
+  }, []);
 
-  // ========== HELPER FUNCTIONS ==========
-  const getStatusBadge = (status) => {
-    switch(status?.toLowerCase()) {
-      case 'approved':
-        return <span className="badge approved"><FaCheckCircle /> Approved</span>;
-      case 'pending':
-        return <span className="badge pending"><FaHourglassHalf /> Pending</span>;
-      case 'ineligible':
-        return <span className="badge ineligible"><FaTimesCircle /> Ineligible</span>;
-      default:
-        return <span className="badge default">{status}</span>;
-    }
+  const handleOverride = () => {
+    navigate('/manual-verification');
   };
 
-  // ========== MENU ITEMS (Kagawad specific) ==========
   const menuItems = [
-    { name: "Dashboard", icon: FaTachometerAlt, path: "/kagawad-dashboard" },
-    { name: "Scan QR", icon: FaQrcode, path: "/scan" },
+    { name: "Dashboard", icon: FaTachometerAlt, path: "/chairman-dashboard" },
+    { name: "Manage Youth", icon: FaUsers, path: "/manage-youth" },
     { name: "Create Program", icon: FaPlusCircle, path: "/create-programs" },
-    { name: "View Programs", icon: FaList, path: "/view-programs" },
-    { name: "Transactions", icon: FaExchangeAlt, path: "/transactions" },
-    { name: "Generate Report", icon: FaChartLine, path: "/generate-reports" },
+    { name: "Generate Reports", icon: FaChartLine, path: "/generate-reports" },
+    { name: "Audit Logs", icon: FaHistory, path: "/audit-logs" },
+    { name: "Manual Verification Youth", icon: FaExclamationTriangle, path: "/manual-verification" },
   ];
 
-  // Show loading while checking authorization
-  if (!isAuthorized) {
-    return (
-      <div className="loading-container">
-        <div className="spinner"></div>
-        <p>Verifying access...</p>
-      </div>
-    );
-  }
-
-  // ========== RENDER WITH CHAIRMAN'S LAYOUT ==========
   return (
     <>
       <Navbar />
       <div className="dashboard-layout">
-        {/* Sidebar - using same class as chairman */}
+        {/* Sidebar */}
         <div className={`sidebar ${!isSidebarOpen ? "collapsed" : ""}`}>
           <button 
             className="sidebar-toggle"
@@ -279,9 +251,9 @@ export default function SKKagawadDashboard() {
           </div>
         </div>
 
-        {/* Main Content - using same class as chairman */}
+        {/* Main Content */}
         <div className={`main-content ${!isSidebarOpen ? "expanded" : ""}`}>
-          {/* Stats Cards - matching chairman layout */}
+          {/* Stats Cards */}
           <div className="stats-grid">
             <div className="stat-card">
               <img src={icon_youth} alt="Youth Icon" className="stat-icon-placeholder" />
@@ -291,20 +263,20 @@ export default function SKKagawadDashboard() {
 
             <div className="stat-card">
               <img src={icon_programs} alt="Programs Icon" className="stat-icon-placeholder" />
-              <h2>{stats.upcomingPrograms}</h2>
-              <p>Upcoming Programs</p>
+              <h2>{stats.programs}</h2>
+              <p>Active Programs</p>
             </div>
 
             <div className="stat-card">
               <img src={icon_transactions} alt="Transactions Icon" className="stat-icon-placeholder" />
-              <h2>{stats.pendingTransactions}</h2>
-              <p>Pending Transactions</p>
+              <h2>{stats.transactions}</h2>
+              <p>Transactions Today</p>
             </div>
 
             <div className="stat-card">
-              <img src={icon_overrides} alt="Overdue Icon" className="stat-icon-placeholder" />
-              <h2>{stats.overdueEquipment}</h2>
-              <p>Overdue Equipment</p>
+              <img src={icon_overrides} alt="Overrides Icon" className="stat-icon-placeholder" />
+              <h2>{stats.overrides}</h2>
+              <p>Manual Verification Today</p>
             </div>
 
             <div className="stat-card">
@@ -314,100 +286,167 @@ export default function SKKagawadDashboard() {
             </div>
           </div>
 
-          {/* Quick Actions Section - matching chairman layout but with Kagawad actions */}
-          <div className="quick-actions-section">
-            <h3>Quick Actions</h3>
-            <div className="actions-grid">
-              <button onClick={() => navigate('/scan')} className="action-btn">
-                <FaQrcode className="action-icon-svg" />
-                <span>Scan QR</span>
-              </button>
-              
-              <button onClick={() => navigate('/create-programs')} className="action-btn">
-                <FaPlusCircle className="action-icon-svg" />
-                <span>Create Program</span>
-              </button>
-              
-              <button onClick={() => navigate('/view-programs')} className="action-btn">
-                <FaList className="action-icon-svg" />
-                <span>View Programs</span>
-              </button>
-              
-              <button onClick={() => navigate('/transactions')} className="action-btn">
-                <FaExchangeAlt className="action-icon-svg" />
-                <span>Transactions</span>
-              </button>
-              
-              <button onClick={() => navigate('/generate-reports')} className="action-btn">
-                <FaChartLine className="action-icon-svg" />
-                <span>Generate Report</span>
-              </button>
+          {/* Charts */}
+          <div className="charts-section">
+            <div className="chart-row">
+              <div className="chart-card">
+                <h3>Youth Registration Trend</h3>
+                <div className="chart-wrapper">
+                  <ResponsiveContainer width="100%" height={300}>
+                    <AreaChart data={chartData.registrationTrend}>
+                      <XAxis dataKey="month" stroke="#888" />
+                      <YAxis stroke="#888" />
+                      <Tooltip />
+                      <Area 
+                        type="monotone" 
+                        dataKey="count" 
+                        stroke="#3B82F6" 
+                        fill="#3B82F6" 
+                        fillOpacity={0.3}
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              <div className="chart-card">
+                <h3>Gender Distribution</h3>
+                <div className="chart-wrapper">
+                  <ResponsiveContainer width="100%" height={300}>
+                    <PieChart>
+                      <Pie
+                        data={chartData.genderDistribution}
+                        dataKey="value"
+                        nameKey="name"
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={100}
+                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                      >
+                        {chartData.genderDistribution.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                      <Legend />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            </div>
+
+            <div className="chart-row">
+              <div className="chart-card">
+                <h3>Program Participation</h3>
+                <div className="chart-wrapper">
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={chartData.programDistribution} layout="vertical">
+                      <XAxis type="number" stroke="#888" />
+                      <YAxis type="category" dataKey="name" stroke="#888" width={100} />
+                      <Tooltip />
+                      <Bar dataKey="value" fill="#F59E0B" radius={[0, 8, 8, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              <div className="chart-card">
+                <h3>Monthly Manual Verification Trend</h3>
+                <div className="chart-wrapper">
+                  <ResponsiveContainer width="100%" height={300}>
+                    <LineChart data={chartData.monthlyOverrides}>
+                      <XAxis dataKey="month" stroke="#888" />
+                      <YAxis stroke="#888" />
+                      <Tooltip />
+                      <Line 
+                        type="monotone" 
+                        dataKey="count" 
+                        stroke="#EF4444" 
+                        strokeWidth={2}
+                        dot={{ fill: "#EF4444", r: 4 }}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* Bottom Section - Two tables side by side like chairman */}
-          {isLoading ? (
-            <div className="loading-state">
-              <div className="spinner"></div>
-              <p>Loading data...</p>
-            </div>
-          ) : (
-            <div className="bottom-section">
-              {/* Ongoing Programs Table */}
-              <div className="info-card">
-                <h3>Ongoing Programs</h3>
-                <div className="info-list">
-                  {ongoingPrograms.length > 0 ? (
-                    ongoingPrograms.map((program, index) => (
-                      <div key={index} className="info-item">
-                        <div className="info-details">
-                          <span className="info-name">{program.youthName || "Unknown"}</span>
-                          <span className="info-program">{program.programName || "-"}</span>
-                          <span className="info-time">
-                            <FaClock className="inline-icon" /> {program.time}
-                          </span>
-                        </div>
-                        <div className="info-meta">
-                          <span className="badge-method">{program.method}</span>
-                          {getStatusBadge(program.status)}
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <p className="no-data">No ongoing programs</p>
-                  )}
-                </div>
-              </div>
+          {/* Quick Actions */}
+        <div className="quick-actions-section">
+          <h3>Quick Actions</h3>
+          <div className="actions-grid">
+            <button onClick={() => navigate('/manage-youth')} className="action-btn">
+              <img src={icon_manageyouth} alt="Manage Youth" className="action-icon" />
+              <span>Manage Youth</span>
+            </button>
+            
+            <button onClick={() => navigate('/create-programs')} className="action-btn">
+              <img src={icon_createprogram} alt="Create Program" className="action-icon" />
+              <span>Create Program</span>
+            </button>
+            
+            <button onClick={() => navigate('/generate-reports')} className="action-btn">
+              <img src={icon_report} alt="Generate Reports" className="action-icon" />
+              <span>Generate Reports</span>
+            </button>
+            
+            <button onClick={handleOverride} className="action-btn">
+              <img src={icon_overrides} alt="Override" className="action-icon" />
+              <span>Manual Verification</span>
+            </button>
+            
+            <button onClick={() => navigate('/audit-logs')} className="action-btn">
+              <img src={icon_audit} alt="Audit Logs" className="action-icon" />
+              <span>View Audit Logs</span>
+            </button>
+          </div>
+        </div>
 
-              {/* Recent QR Scans Table */}
-              <div className="info-card">
-                <h3>Recent QR Scans</h3>
-                <div className="info-list">
-                  {recentScans.length > 0 ? (
-                    recentScans.map((scan, index) => (
-                      <div key={index} className="info-item">
-                        <div className="info-details">
-                          <span className="info-name">{scan.youthName || "Unknown"}</span>
-                          <span className="info-program">{scan.programName || "-"}</span>
-                          <span className="info-time">
-                            <FaClock className="inline-icon" /> {scan.time}
-                          </span>
-                        </div>
-                        <div className="info-meta">
-                          <span className="badge-method">
-                            <FaQrcode className="inline-icon" /> {scan.method}
-                          </span>
-                          {getStatusBadge(scan.status)}
-                        </div>
+          {/* Recent Data */}
+          <div className="bottom-section">
+            <div className="info-card">
+              <h3>Recent Manual Verification</h3>
+              <div className="info-list">
+                {recentOverrides.length > 0 ? (
+                  recentOverrides.map((override, index) => (
+                    <div key={index} className="info-item">
+                      <div className="info-details">
+                        <span className="info-name">
+                          {override.youth?.first_name} {override.youth?.last_name}
+                        </span>
+                        <span className="info-program">{override.programs?.program_name}</span>
                       </div>
-                    ))
-                  ) : (
-                    <p className="no-data">No recent QR scans</p>
-                  )}
-                </div>
+                      <span className="badge urgent">Manual Verification</span>
+                    </div>
+                  ))
+                ) : (
+                  <p className="no-data">No recent Manual Verification</p>
+                )}
               </div>
             </div>
-          )}
+
+            <div className="info-card">
+              <h3>Active Programs</h3>
+              <div className="info-list">
+                {activePrograms.length > 0 ? (
+                  activePrograms.map((program, index) => (
+                    <div key={index} className="info-item">
+                      <div className="info-details">
+                        <span className="info-name">{program.program_name}</span>
+                        <span className="info-date">
+                          Started: {format(new Date(program.start_date), "MMM dd, yyyy")}
+                        </span>
+                      </div>
+                      <span className="badge active">Active</span>
+                    </div>
+                  ))
+                ) : (
+                  <p className="no-data">No active programs</p>
+                )}
+              </div>
+            </div>
+          </div>
 
           {/* Footer */}
           <div className="dashboard-footer">

@@ -12,20 +12,18 @@ import qclogo from "../assets/qc-logo.png";
 import sklogoo from "../assets/sk-logoo.png";
 
 function Login() {
-
   const navigate = useNavigate();
-
-  const [userId, setUserId] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loginAttempts, setLoginAttempts] = useState(0);
+  const [isLoading, setIsLoading] = useState(false);
 
-
-  /*Login Notifications when user forgot password*/
   const handleLogin = async (e) => {
     e.preventDefault();
-
+    
+    if (isLoading) return;
+    
     if (loginAttempts >= 3) {
       toast.error("Too many incorrect attempts. Please contact the IT administrator.");
       await logActivity({
@@ -37,65 +35,142 @@ function Login() {
       return;
     }
 
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password
-    });
+    setIsLoading(true);
 
-    if (error) {
+    try {
+      // First, check if user exists in your users table
+      const { data: userCheck, error: userCheckError } = await supabase
+        .from("users")
+        .select("email, role_id, user_status")
+        .eq("email", email)
+        .single();
 
-      const newAttempts = loginAttempts + 1;
-      setLoginAttempts(newAttempts);
+      if (userCheckError || !userCheck) {
+        const newAttempts = loginAttempts + 1;
+        setLoginAttempts(newAttempts);
+        
+        await logActivity({
+          action: "LOGIN_FAILED",
+          table: "auth",
+          recordId: null,
+          details: `Failed login attempt ${newAttempts} of 3 for email: ${email} - User not found in users table`
+        });
 
-      await logActivity({
-        action: "LOGIN_FAILED",
-        table: "auth",
-        recordId: null,
-        details: `Failed login attempt ${newAttempts} of 3 for email: ${email}`
+        toast.error(`Email not found. Attempt ${newAttempts} of 3.`);
+        setIsLoading(false);
+        return;
+      }
+
+      // Check if user is active
+      if (userCheck.user_status !== 'active') {
+        toast.error("Your account is inactive. Please contact the administrator.");
+        await logActivity({
+          action: "LOGIN_FAILED",
+          table: "auth",
+          recordId: null,
+          details: `Inactive account login attempt for email: ${email}`
+        });
+        setIsLoading(false);
+        return;
+      }
+
+      // Attempt authentication
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password
       });
 
-      if (newAttempts >= 3) {
-        toast.error("Login failed 3 times. Please contact the IT administrator using Forgot Password.");
-      } else {
-        toast.error(`Incorrect email or password. Attempt ${newAttempts} of 3.`);
+      if (error) {
+        const newAttempts = loginAttempts + 1;
+        setLoginAttempts(newAttempts);
+
+        await logActivity({
+          action: "LOGIN_FAILED",
+          table: "auth",
+          recordId: null,
+          details: `Failed login attempt ${newAttempts} of 3 for email: ${email} - ${error.message}`
+        });
+
+        if (newAttempts >= 3) {
+          toast.error("Login failed 3 times. Please contact the IT administrator.");
+        } else {
+          toast.error(`Incorrect password. Attempt ${newAttempts} of 3.`);
+        }
+        
+        setIsLoading(false);
+        return;
       }
 
-      return;
+      // Login successful
+      const user = data.user;
+
+      // Verify the user exists in your users table with correct role
+      const { data: userData, error: userDataError } = await supabase
+        .from("users")
+        .select("role_id, first_name, last_name, user_status")
+        .eq("user_id", user.id)
+        .single();
+
+      if (userDataError || !userData) {
+        toast.error("User profile not found. Please contact administrator.");
+        await logActivity({
+          action: "LOGIN_FAILED",
+          table: "auth",
+          recordId: user.id,
+          details: `User ${email} authenticated but profile not found in users table`
+        });
+        
+        // Sign out since user exists in auth but not in users table
+        await supabase.auth.signOut();
+        setIsLoading(false);
+        return;
+      }
+
+      // Store user info in localStorage for persistence
+      localStorage.setItem('userRole', userData.role_id);
+      localStorage.setItem('userName', `${userData.first_name} ${userData.last_name}`);
+      localStorage.setItem('userId', user.id);
+
+      await logActivity({
+        action: "LOGIN_SUCCESS",
+        table: "auth",
+        recordId: user.id,
+        details: `User ${email} logged in successfully with role_id: ${userData.role_id}`
+      });
+
+      toast.success(`Welcome back, ${userData.first_name}! Redirecting...`);
+
+      // Redirect based on role_id
+      setTimeout(() => {
+        if (userData.role_id === 1) {
+          navigate("/chairman-dashboard");
+        } else if (userData.role_id === 2) {
+          navigate("/kagawad-dashboard");
+        } else {
+          // Default redirect or handle other roles
+          toast.error("Unknown user role. Please contact administrator.");
+          supabase.auth.signOut();
+        }
+      }, 1200);
+
+    } catch (error) {
+      console.error("Login error:", error);
+      toast.error("An unexpected error occurred. Please try again.");
+      
+      await logActivity({
+        action: "LOGIN_ERROR",
+        table: "auth",
+        recordId: null,
+        details: `Unexpected error during login for email: ${email} - ${error.message}`
+      });
+      
+      setIsLoading(false);
     }
-     /*Login sucess*/
-    toast.success("Login successful! Redirecting...");
-
-    const user = data.user;
-
-    const { data: userData } = await supabase
-      .from("users")
-      .select("role_id")
-      .eq("user_id", user.id)
-      .single();
-
-    await logActivity({
-      action: "LOGIN_SUCCESS",
-      table: "auth",
-      recordId: user.id,
-      details: `User ${email} logged in successfully with role_id: ${userData?.role_id}`
-    });
-
-    setTimeout(() => {
-      if (userData.role_id === 1) {
-        navigate("/chairman-dashboard");
-      } else {
-        navigate("/kagawad-dashboard");
-      }
-    }, 1200);
-
   };
 
   return (
-
     <div style={{ display: "flex", height: "100vh", width: "100vw" }}>
-
       {/* leftside part */}
-
       <div
         style={{
           flex: 1,
@@ -107,7 +182,6 @@ function Login() {
       />
 
       {/* right side part */}
-
       <div
         style={{
           width: "550px",
@@ -118,13 +192,11 @@ function Login() {
           padding: "90px"
         }}
       >
-
         {/* top logos */}
-
         <div style={{ textAlign: "center", marginBottom: "30px" }}>
-          <img src={qclogo} width="100" />
-          <img src={skLogo} width="100" style={{ margin: "0 10px" }} />
-          <img src={sklogoo} width="100" />
+          <img src={qclogo} width="100" alt="QC Logo" />
+          <img src={skLogo} width="100" style={{ margin: "0 10px" }} alt="SK Logo" />
+          <img src={sklogoo} width="100" alt="SK Logo" />
         </div>
 
         <p
@@ -141,89 +213,66 @@ function Login() {
         <p style={{ marginBottom: "40px" }}>Sign-in to your account.</p>
 
         <form onSubmit={handleLogin}>
-
-          {/* textfields*/}
-
           <label>
-            User ID <span style={{ color: "#FF0000" }}>*</span>
-          </label>
-
-          <input
-            type="text"
-            value={userId}
-            onChange={(e) => setUserId(e.target.value)}
-            style={inputStyle}
-            required
-          />
-
-          { }
-
-          <label style={{ marginTop: "25px" }}>
             Email <span style={{ color: "#FF0000" }}>*</span>
           </label>
-
           <input
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             style={inputStyle}
+            placeholder="Enter your email address"
             required
+            disabled={isLoading}
           />
-
-          { }
 
           <label style={{ marginTop: "25px" }}>
             Password <span style={{ color: "#FF0000" }}>*</span>
           </label>
-
           <div style={{ position: "relative" }}>
-
             <input
               type={showPassword ? "text" : "password"}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               style={inputStyle}
+              placeholder="Enter your password"
               required
+              disabled={isLoading}
             />
-
             <span
-              onClick={() => setShowPassword(!showPassword)}
+              onClick={() => !isLoading && setShowPassword(!showPassword)}
               style={{
-                position:"absolute",
-                right:"10px",
-                top:"14px",
-                color:"#7A601D",
-                cursor:"pointer",
-                fontSize:"18px"
+                position: "absolute",
+                right: "10px",
+                top: "14px",
+                color: "#7A601D",
+                cursor: isLoading ? "not-allowed" : "pointer",
+                fontSize: "18px"
               }}
             >
-              {showPassword ? <FaEyeSlash/> : <FaEye/>}
+              {showPassword ? <FaEyeSlash /> : <FaEye />}
             </span>
-
           </div>
-
-          {/* login button*/}
 
           <button
             type="submit"
+            disabled={isLoading}
             style={{
               marginTop: "50px",
               width: "100%",
-              backgroundColor: "#032541",
+              backgroundColor: isLoading ? "#cccccc" : "#032541",
               color: "white",
               padding: "12px",
               border: "none",
               borderRadius: "6px",
               fontWeight: "bold",
-              cursor: "pointer"
+              cursor: isLoading ? "not-allowed" : "pointer",
+              opacity: isLoading ? 0.7 : 1
             }}
           >
-            Login
+            {isLoading ? "Logging in..." : "Login"}
           </button>
-
         </form>
-
-        {/* forgot password */}
 
         <div style={{ textAlign: "center", marginTop: "15px" }}>
           <Link
@@ -246,9 +295,7 @@ function Login() {
         >
           iSKan v1.0 | Barangay Pinagkaisahan | For Authorized Users Only
         </p>
-
       </div>
-
     </div>
   );
 }
@@ -260,7 +307,10 @@ const inputStyle = {
   marginTop: "6px",
   borderRadius: "6px",
   border: "1px solid #832200",
-  backgroundColor: "#FDFFCA"
+  backgroundColor: "#FDFFCA",
+  boxSizing: "border-box",
+  outline: "none",
+  transition: "border-color 0.3s"
 };
 
 export default Login;

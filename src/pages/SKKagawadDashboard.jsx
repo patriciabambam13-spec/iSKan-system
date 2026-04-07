@@ -11,10 +11,17 @@ import {
 } from "react-icons/fa";
 import "../styles/dashboard.css";
 
+// Use the SAME images that Chairman dashboard uses
+import icon_youth from "../assets/totalyouth_ca.png";
+import icon_programs from "../assets/activeprograms_ca.png";
+import icon_transactions from "../assets/transactions_ca.png";
+import icon_overrides from "../assets/overrides_ca.png";
+import icon_benefeciaries from "../assets/beneficiaries_ca.png";
+
 export default function SKKagawadDashboard() {
   const navigate = useNavigate();
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [isAuthorized, setIsAuthorized] = useState(false);
+  const [ setIsAuthorized] = useState(false);
   const [stats, setStats] = useState({
     youth: 0,
     upcomingPrograms: 0,
@@ -210,17 +217,17 @@ export default function SKKagawadDashboard() {
   const getStatusBadge = (status) => {
     switch(status?.toLowerCase()) {
       case 'approved':
-        return <span className="status-badge approved"><FaCheckCircle /> Approved</span>;
+        return <span className="badge approved"><FaCheckCircle /> Approved</span>;
       case 'pending':
-        return <span className="status-badge pending"><FaHourglassHalf /> Pending</span>;
+        return <span className="badge pending"><FaHourglassHalf /> Pending</span>;
       case 'ineligible':
-        return <span className="status-badge ineligible"><FaTimesCircle /> Ineligible</span>;
+        return <span className="badge ineligible"><FaTimesCircle /> Ineligible</span>;
       default:
-        return <span className="status-badge default">{status}</span>;
+        return <span className="badge default">{status}</span>;
     }
   };
 
-  // ========== MENU ITEMS ==========
+  // ========== MENU ITEMS (Kagawad specific) ==========
   const menuItems = [
     { name: "Dashboard", icon: FaTachometerAlt, path: "/kagawad-dashboard" },
     { name: "Scan QR", icon: FaQrcode, path: "/scan" },
@@ -234,9 +241,9 @@ export default function SKKagawadDashboard() {
   return (
     <>
       <Navbar />
-      <div className="kagawad-dashboard-layout">
+      <div className="dashboard-layout">
         {/* Sidebar */}
-        <div className={`kagawad-sidebar ${!isSidebarOpen ? "collapsed" : ""}`}>
+        <div className={`sidebar ${!isSidebarOpen ? "collapsed" : ""}`}>
           <button 
             className="sidebar-toggle"
             onClick={() => setIsSidebarOpen(!isSidebarOpen)}
@@ -261,65 +268,37 @@ export default function SKKagawadDashboard() {
         </div>
 
         {/* Main Content */}
-        <div className={`kagawad-main-content ${!isSidebarOpen ? "expanded" : ""}`}>
-          {/* Header */}
-          <div className="page-header">
-            <div className="header-text">
-              <h2>SK Kagawad Dashboard</h2>
-              <p>Manage youth programs, track transactions, and monitor QR scans</p>
-            </div>
-          </div>
-
+        <div className={`main-content ${!isSidebarOpen ? "expanded" : ""}`}>
           {/* Stats Cards */}
           <div className="stats-grid">
             <div className="stat-card">
-              <div className="stat-icon blue">
-                <FaUsers />
-              </div>
-              <div className="stat-info">
-                <h3>{stats.youth}</h3>
-                <p>Total Registered Youth</p>
-              </div>
+              <img src={icon_youth} alt="Youth Icon" className="stat-icon-placeholder" />
+              <h2>{stats.youth}</h2>
+              <p>Total Registered Youth</p>
             </div>
 
             <div className="stat-card">
-              <div className="stat-icon green">
-                <FaCalendarAlt />
-              </div>
-              <div className="stat-info">
-                <h3>{stats.upcomingPrograms}</h3>
-                <p>Upcoming Programs</p>
-              </div>
+              <img src={icon_programs} alt="Programs Icon" className="stat-icon-placeholder" />
+              <h2>{stats.upcomingPrograms}</h2>
+              <p>Upcoming Programs</p>
             </div>
 
             <div className="stat-card">
-              <div className="stat-icon orange">
-                <FaExchangeAlt />
-              </div>
-              <div className="stat-info">
-                <h3>{stats.pendingTransactions}</h3>
-                <p>Pending Transactions</p>
-              </div>
+              <img src={icon_transactions} alt="Transactions Icon" className="stat-icon-placeholder" />
+              <h2>{stats.pendingTransactions}</h2>
+              <p>Pending Transactions</p>
             </div>
 
             <div className="stat-card">
-              <div className="stat-icon red">
-                <FaExclamationTriangle />
-              </div>
-              <div className="stat-info">
-                <h3>{stats.overdueEquipment}</h3>
-                <p>Overdue Equipment</p>
-              </div>
+              <img src={icon_overrides} alt="Overdue Icon" className="stat-icon-placeholder" />
+              <h2>{stats.overdueEquipment}</h2>
+              <p>Overdue Equipment</p>
             </div>
 
             <div className="stat-card">
-              <div className="stat-icon purple">
-                <FaUsers />
-              </div>
-              <div className="stat-info">
-                <h3>{stats.beneficiaries}</h3>
-                <p>Beneficiaries This Month</p>
-              </div>
+              <img src={icon_benefeciaries} alt="Beneficiaries Icon" className="stat-icon-placeholder" />
+              <h2>{stats.beneficiaries}</h2>
+              <p>Beneficiaries This Month</p>
             </div>
           </div>
 
@@ -354,85 +333,65 @@ export default function SKKagawadDashboard() {
             </div>
           </div>
 
-          {/* Tables Section */}
+          {/* Bottom Section */}
           {isLoading ? (
             <div className="loading-state">
               <div className="spinner"></div>
               <p>Loading data...</p>
             </div>
           ) : (
-            <div className="tables-section">
-              {/* Ongoing Programs Table */}
+            <div className="bottom-section">
+              {/* Ongoing Programs Card */}
               <div className="info-card">
                 <h3>Ongoing Programs</h3>
-                <div className="table-container">
-                  <table className="data-table">
-                    <thead>
-                      <tr>
-                        <th>Youth Name</th>
-                        <th>Program</th>
-                        <th>Time</th>
-                        <th>Method</th>
-                        <th>Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {ongoingPrograms.length > 0 ? (
-                        ongoingPrograms.map((program, index) => (
-                          <tr key={index}>
-                            <td>{program.youthName || "Unknown"}</td>
-                            <td>{program.programName || "-"}</td>
-                            <td><FaClock className="inline-icon" /> {program.time}</td>
-                            <td>{program.method}</td>
-                            <td>{getStatusBadge(program.status)}</td>
-                          </tr>
-                        ))
-                      ) : (
-                        <tr>
-                          <td colSpan="5" className="empty-state">
-                            No ongoing programs
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
+                <div className="info-list">
+                  {ongoingPrograms.length > 0 ? (
+                    ongoingPrograms.map((program, index) => (
+                      <div key={index} className="info-item">
+                        <div className="info-details">
+                          <span className="info-name">{program.youthName || "Unknown"}</span>
+                          <span className="info-program">{program.programName || "-"}</span>
+                          <span className="info-time">
+                            <FaClock className="inline-icon" /> {program.time}
+                          </span>
+                        </div>
+                        <div className="info-meta">
+                          <span className="badge-method">{program.method}</span>
+                          {getStatusBadge(program.status)}
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="no-data">No ongoing programs</p>
+                  )}
                 </div>
               </div>
 
-              {/* Recent QR Scans Table */}
+              {/* Recent QR Scans Card */}
               <div className="info-card">
                 <h3>Recent QR Scans</h3>
-                <div className="table-container">
-                  <table className="data-table">
-                    <thead>
-                      <tr>
-                        <th>Youth Name</th>
-                        <th>Program</th>
-                        <th>Time</th>
-                        <th>Method</th>
-                        <th>Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {recentScans.length > 0 ? (
-                        recentScans.map((scan, index) => (
-                          <tr key={index}>
-                            <td>{scan.youthName || "Unknown"}</td>
-                            <td>{scan.programName || "-"}</td>
-                            <td><FaClock className="inline-icon" /> {scan.time}</td>
-                            <td><FaQrcode className="inline-icon" /> {scan.method}</td>
-                            <td>{getStatusBadge(scan.status)}</td>
-                          </tr>
-                        ))
-                      ) : (
-                        <tr>
-                          <td colSpan="5" className="empty-state">
-                            No recent QR scans
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
+                <div className="info-list">
+                  {recentScans.length > 0 ? (
+                    recentScans.map((scan, index) => (
+                      <div key={index} className="info-item">
+                        <div className="info-details">
+                          <span className="info-name">{scan.youthName || "Unknown"}</span>
+                          <span className="info-program">{scan.programName || "-"}</span>
+                          <span className="info-time">
+                            <FaClock className="inline-icon" /> {scan.time}
+                          </span>
+                        </div>
+                        <div className="info-meta">
+                          <span className="badge-method">
+                            <FaQrcode className="inline-icon" /> {scan.method}
+                          </span>
+                          {getStatusBadge(scan.status)}
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="no-data">No recent QR scans</p>
+                  )}
                 </div>
               </div>
             </div>
