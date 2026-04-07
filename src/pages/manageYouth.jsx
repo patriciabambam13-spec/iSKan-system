@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { useNavigate } from 'react-router-dom';
 import Navbar from "../components/Navbar";
 import { supabase } from "../services/supabaseClient";
+import { logActivity } from "../utils/logActivity";
 import "../styles/manageYouth.css";
 
 import { 
@@ -271,7 +272,7 @@ export default function ManageYouth() {
     }
   };
   
-  // Delete youth - IMPROVED with .select() and proper state updates
+  // Delete youth with audit log
   const handleDelete = async () => {
     if (!deleteTarget) {
       toast.error("No record selected");
@@ -283,12 +284,11 @@ export default function ManageYouth() {
     const loadingToast = toast.loading(`Deleting ${deleteName}...`);
     
     try {
-      // IMPORTANT: Added .select() to verify deletion
       const { data, error } = await supabase
         .from("youth")
         .delete()
         .eq("id", deleteId)
-        .select(); // 👈 KEY FIX - verifies what was deleted
+        .select();
       
       console.log("DELETE RESULT:", data, error);
       
@@ -298,22 +298,26 @@ export default function ManageYouth() {
         return;
       }
       
-      // Check if anything was actually deleted
       if (!data || data.length === 0) {
         throw new Error("No row deleted. Check RLS policy or ID.");
       }
       
+      // Log the delete activity
+      await logActivity({
+        action: "DELETE",
+        table: "youth",
+        recordId: deleteId,
+        details: `Deleted youth record: ${deleteName}`,
+        oldData: deleteTarget
+      });
+      
       toast.success(`${deleteName} deleted successfully`, { id: loadingToast });
       
-      // Update UI with functional state to avoid stale closures
       setYouths(prev => {
         const updated = prev.filter(y => y.id !== deleteId);
-        
-        // Handle pagination if current page becomes empty
         if (updated.length === 0 && page > 1) {
           setPage(prevPage => prevPage - 1);
         }
-        
         return updated;
       });
       
@@ -321,7 +325,6 @@ export default function ManageYouth() {
       setShowDelete(false);
       setDeleteTarget(null);
       
-      // Optional background refresh for perfect sync
       setTimeout(() => fetchYouth(), 500);
       
     } catch (error) {
@@ -330,8 +333,11 @@ export default function ManageYouth() {
     }
   };
   
-  // Update youth
+  // Update youth with audit log
   const handleUpdate = async (formData) => {
+    const oldData = editTarget;
+    const loadingToast = toast.loading("Updating youth record...");
+    
     try {
       const { error } = await supabase
         .from("youth")
@@ -344,11 +350,22 @@ export default function ManageYouth() {
           email: formData.email,
           address: formData.address
         })
-        .eq("id", formData.id);
+        .eq("id", formData.id)
+        .select();
       
       if (error) throw error;
       
-      toast.success("Youth updated successfully");
+      // Log the update activity
+      await logActivity({
+        action: "UPDATE",
+        table: "youth",
+        recordId: formData.id,
+        details: `Updated youth record: ${getFullName(formData)}`,
+        oldData: oldData,
+        newData: formData
+      });
+      
+      toast.success("Youth updated successfully", { id: loadingToast });
       setShowEdit(false);
       setEditTarget(null);
       await fetchYouth();
@@ -358,7 +375,7 @@ export default function ManageYouth() {
       }
     } catch (error) {
       console.error("Update error:", error);
-      toast.error("Update failed: " + error.message);
+      toast.error(`Update failed: ${error.message}`, { id: loadingToast });
     }
   };
   
@@ -391,6 +408,14 @@ export default function ManageYouth() {
     setActiveTab("details");
     await fetchTransactions(youth.id);
     setShowView(true);
+    
+    // Log view activity (optional - can be commented out if too many logs)
+    await logActivity({
+      action: "VIEW",
+      table: "youth",
+      recordId: youth.id,
+      details: `Viewed youth profile: ${getFullName(youth)}`
+    });
   };
   
   const handlePageChange = (newPage) => {
@@ -445,9 +470,27 @@ export default function ManageYouth() {
     link.click();
     URL.revokeObjectURL(link.href);
     toast.success("CSV exported!");
+    
+    // Log export activity
+    logActivity({
+      action: "EXPORT",
+      table: "youth",
+      recordId: null,
+      details: `Exported ${youths.length} youth records to CSV`
+    });
   };
   
-  const exportPDF = () => window.print();
+  const exportPDF = () => {
+    window.print();
+    
+    // Log export activity
+    logActivity({
+      action: "EXPORT",
+      table: "youth",
+      recordId: null,
+      details: `Printed ${youths.length} youth records`
+    });
+  };
   
   // Pagination
   const renderPagination = () => {
@@ -656,7 +699,7 @@ export default function ManageYouth() {
                         ) : (
                           <div className="photo-placeholder"><FaUser /></div>
                         )}
-                      </td>
+                       </td>
                       <td className="name-cell"><div className="youth-name">{getFullName(youth)}</div></td>
                       <td className="id-cell">{youth.qr_code || '-'}</td>
                       <td className="age-cell">{youth.age || '-'}</td>

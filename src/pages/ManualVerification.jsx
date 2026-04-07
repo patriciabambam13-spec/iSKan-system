@@ -2,29 +2,59 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import { supabase } from "../services/supabaseClient";
-import { 
-  FaSearch, FaUserCheck, FaIdCard, FaCalendarAlt, 
+import { logActivity } from "../utils/logActivity";
+import {
+  FaSearch, FaUserCheck, FaIdCard, FaCalendarAlt,
   FaPhone, FaEnvelope, FaVenusMars, FaCheckCircle,
   FaTimesCircle, FaExclamationTriangle, FaQrcode,
-  FaArrowLeft, FaUser, FaInfoCircle
+  FaArrowLeft, FaUser, FaInfoCircle, FaHistory,
+  FaClipboardCheck, FaSave, FaMapMarkerAlt
 } from "react-icons/fa";
 import "../styles/ManualVerification.css";
 
 export default function ManualVerification() {
   const navigate = useNavigate();
-  const [searchTerm, setSearchTerm] = useState("");
-  const [searchResults, setSearchResults] = useState([]);
-  const [selectedYouth, setSelectedYouth] = useState(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [verifying, setVerifying] = useState(false);
-  const [programs, setPrograms] = useState([]);
-  const [selectedProgram, setSelectedProgram] = useState("");
-  const [verificationNote, setVerificationNote] = useState("");
-  const [verificationResult, setVerificationResult] = useState(null);
 
+  const [searchTerm, setSearchTerm]                   = useState("");
+  const [searchResults, setSearchResults]             = useState([]);
+  const [selectedYouth, setSelectedYouth]             = useState(null);
+  const [isLoading, setIsLoading]                     = useState(false);
+  const [verifying, setVerifying]                     = useState(false);
+  const [programs, setPrograms]                       = useState([]);
+  const [selectedProgram, setSelectedProgram]         = useState("");
+  const [verificationNote, setVerificationNote]       = useState("");
+  const [verificationResult, setVerificationResult]   = useState(null);
+  const [identityConfirmed, setIdentityConfirmed]     = useState(false);
+  const [confirmMethod, setConfirmMethod]             = useState("");
+  const [confirmInput, setConfirmInput]               = useState("");
+  const [selectedReason, setSelectedReason]           = useState("");
+  const [customReason, setCustomReason]               = useState("");
+  const [todayAttendance, setTodayAttendance]         = useState(null);
+  const [verificationHistory, setVerificationHistory] = useState([]);
+  const [showHistory, setShowHistory]                 = useState(false);
+  const [userRole, setUserRole]                       = useState(null);
+
+  // ─── Init ────────────────────────────────────────────────────────────────
   useEffect(() => {
     fetchPrograms();
+    getUserRole();
   }, []);
+
+  const getUserRole = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data } = await supabase
+          .from("users")
+          .select("role_id")
+          .eq("user_id", user.id)
+          .single();
+        setUserRole(data?.role_id ?? null);
+      }
+    } catch (err) {
+      console.error("getUserRole:", err);
+    }
+  };
 
   const fetchPrograms = async () => {
     try {
@@ -32,101 +62,175 @@ export default function ManualVerification() {
         .from("programs")
         .select("*")
         .eq("status", "Active");
-
       if (error) throw error;
       setPrograms(data || []);
-    } catch (error) {
-      console.error("Error fetching programs:", error);
+    } catch (err) {
+      console.error("fetchPrograms:", err);
     }
   };
 
+  // ─── Search ──────────────────────────────────────────────────────────────
+  // Avoids .or() quirks by running two parallel .ilike() queries and merging
   const searchYouth = async () => {
     if (!searchTerm.trim()) {
       setSearchResults([]);
       return;
     }
-
     setIsLoading(true);
     try {
-      const { data, error } = await supabase
-        .from("youth")
-        .select(`
-          *,
-          programs(program_name)
-        `)
-        .or(`first_name.ilike.%${searchTerm}%,last_name.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%,contact.ilike.%${searchTerm}%`)
-        .limit(10);
+      const term = `%${searchTerm.trim()}%`;
+      const [r1, r2] = await Promise.all([
+        supabase.from("youth").select("*, programs(program_name)").ilike("first_name", term).limit(10),
+        supabase.from("youth").select("*, programs(program_name)").ilike("last_name",  term).limit(10),
+      ]);
+      if (r1.error) console.error("Search (first_name) error:", r1.error);
+      if (r2.error) console.error("Search (last_name) error:",  r2.error);
 
-      if (error) throw error;
-      setSearchResults(data || []);
-    } catch (error) {
-      console.error("Error searching youth:", error);
+      const combined = [...(r1.data || []), ...(r2.data || [])];
+      const unique   = Array.from(new Map(combined.map((y) => [y.id, y])).values());
+      setSearchResults(unique.slice(0, 10));
+    } catch (err) {
+      console.error("searchYouth:", err);
     } finally {
       setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    const delayDebounce = setTimeout(() => {
-      if (searchTerm) {
-        searchYouth();
-      } else {
-        setSearchResults([]);
-      }
-    }, 500);
-
-    return () => clearTimeout(delayDebounce);
+    const t = setTimeout(() => {
+      searchTerm ? searchYouth() : setSearchResults([]);
+    }, 400);
+    return () => clearTimeout(t);
   }, [searchTerm]);
 
-  const handleVerify = async () => {
-    if (!selectedYouth || !selectedProgram) {
-      alert("Please select a youth and program");
+  // ─── Attendance helpers ──────────────────────────────────────────────────
+  const checkTodayAttendance = async (youthId, programId) => {
+    if (!youthId || !programId) return null;
+    try {
+      const today = new Date().toISOString().split("T")[0];
+      const { data, error } = await supabase
+        .from("attendance")                       // ✅ correct table
+        .select("*")
+        .eq("youth_id", youthId)
+        .eq("program_id", programId)
+        .gte("scanned_at", today)
+        .lte("scanned_at", `${today}T23:59:59`);
+      if (error) throw error;
+      return data?.length > 0 ? data[0] : null;
+    } catch (err) {
+      console.error("checkTodayAttendance:", err);
+      return null;
+    }
+  };
+
+  const fetchVerificationHistory = async (youthId) => {
+    try {
+      const { data, error } = await supabase
+        .from("audit_logs")
+        .select("*")
+        .eq("record_id", String(youthId))
+        .eq("action", "MANUAL_VERIFY")
+        .order("created_at", { ascending: false })
+        .limit(10);
+      if (error) throw error;
+      setVerificationHistory(data || []);
+    } catch (err) {
+      console.error("fetchVerificationHistory:", err);
+    }
+  };
+
+  // ─── Select youth ────────────────────────────────────────────────────────
+  const handleSelectYouth = async (youth) => {
+    setSelectedYouth(youth);
+    setIdentityConfirmed(false);
+    setConfirmMethod("");
+    setConfirmInput("");
+    setSelectedReason("");
+    setCustomReason("");
+    setVerificationResult(null);
+    setTodayAttendance(null);
+    setSearchResults([]);   // collapse results after picking
+
+    if (selectedProgram) {
+      const att = await checkTodayAttendance(youth.id, selectedProgram);
+      setTodayAttendance(att);
+    }
+    await fetchVerificationHistory(youth.id);
+  };
+
+  // ─── Confirm identity ────────────────────────────────────────────────────
+  const handleConfirmIdentity = () => {
+    if (!confirmMethod) {
+      alert("Please select a verification method");
+      return;
+    }
+    let valid = false;
+    if (confirmMethod === "id") {
+      valid = true;
+    } else if (confirmMethod === "birthdate") {
+      const match = new Date(confirmInput).toDateString() === new Date(selectedYouth.birthdate).toDateString();
+      if (!match) { alert("Birthdate does not match our records"); return; }
+      valid = true;
+    } else if (confirmMethod === "contact") {
+      if (confirmInput !== selectedYouth.contact) { alert("Contact number does not match our records"); return; }
+      valid = true;
+    }
+    if (valid) {
+      setIdentityConfirmed(true);
+      logActivity({
+        action:   "IDENTITY_CONFIRMED",
+        table:    "youth",
+        recordId: selectedYouth.id,
+        details:  `Identity confirmed via ${confirmMethod} for manual verification`,
+      });
+    }
+  };
+
+  // ─── Mark attendance ─────────────────────────────────────────────────────
+  const handleMarkAttendance = async () => {
+    if (!selectedYouth || !selectedProgram) { alert("Please select a youth and program"); return; }
+    if (!identityConfirmed)                 { alert("Please confirm the youth's identity first"); return; }
+    if (!selectedReason)                    { alert("Please select a reason for manual verification"); return; }
+
+    const finalReason = selectedReason === "Other" ? customReason : selectedReason;
+    if (!finalReason) { alert("Please provide a reason for manual verification"); return; }
+
+    const existing = await checkTodayAttendance(selectedYouth.id, selectedProgram);
+    if (existing) {
+      setVerificationResult({ success: false, message: "Youth is already marked present for this program today." });
+      setTimeout(() => setVerificationResult(null), 3500);
       return;
     }
 
     setVerifying(true);
     try {
-      // Create transaction record
-      const { data: transaction, error: transactionError } = await supabase
-        .from("transactions")
-        .insert([
-          {
-            youth_id: selectedYouth.id,
-            program_id: selectedProgram,
-            method: "Manual Verification",
-            status: "approved",
-            notes: verificationNote || "Manual verification due to forgotten QR code",
-            verified_by: (await supabase.auth.getUser()).data.user?.id,
-            verified_at: new Date().toISOString(),
-            created_at: new Date().toISOString()
-          }
-        ])
+      const { data: { user } } = await supabase.auth.getUser();
+
+      // ✅ Insert into attendance — columns match schema (including reason + verified_by from ALTER)
+      const { data: attendance, error } = await supabase
+        .from("attendance")
+        .insert([{
+          youth_id:    selectedYouth.id,
+          program_id:  selectedProgram,
+          method:      "manual",      // CHECK ('qr','manual')
+          reason:      finalReason,
+          verified_by: user?.id,
+          // scanned_at defaults to NOW()
+        }])
         .select()
         .single();
 
-      if (transactionError) throw transactionError;
+      if (error) throw error;
 
-      // Create audit log
-      await supabase
-        .from("audit_logs")
-        .insert([
-          {
-            action: "MANUAL_VERIFICATION",
-            table_name: "transactions",
-            record_id: transaction.id,
-            details: `Manual verification for ${selectedYouth.first_name} ${selectedYouth.last_name} - QR code forgotten`,
-            user_id: (await supabase.auth.getUser()).data.user?.id,
-            created_at: new Date().toISOString()
-          }
-        ]);
-
-      setVerificationResult({
-        success: true,
-        message: "Youth successfully verified!",
-        transaction: transaction
+      await logActivity({
+        action:   "MANUAL_VERIFY",
+        table:    "attendance",
+        recordId: attendance.id,
+        details:  `Manual verification for ${selectedYouth.first_name} ${selectedYouth.last_name} — Reason: ${finalReason}${verificationNote ? ` | Notes: ${verificationNote}` : ""}`,
       });
 
-      // Reset after 3 seconds
+      setVerificationResult({ success: true, message: "Attendance recorded successfully!" });
+
       setTimeout(() => {
         setVerificationResult(null);
         setSelectedYouth(null);
@@ -134,73 +238,104 @@ export default function ManualVerification() {
         setVerificationNote("");
         setSearchTerm("");
         setSearchResults([]);
+        setIdentityConfirmed(false);
+        setSelectedReason("");
+        setCustomReason("");
+        setTodayAttendance(null);
       }, 3000);
 
-    } catch (error) {
-      console.error("Error verifying youth:", error);
-      setVerificationResult({
-        success: false,
-        message: error.message || "Failed to verify youth"
+    } catch (err) {
+      console.error("handleMarkAttendance:", err);
+      await logActivity({
+        action:   "MANUAL_VERIFY_FAILED",
+        table:    "attendance",
+        recordId: null,
+        details:  `Failed to verify ${selectedYouth?.first_name} ${selectedYouth?.last_name} — ${err.message}`,
       });
-      
-      setTimeout(() => {
-        setVerificationResult(null);
-      }, 3000);
+      setVerificationResult({ success: false, message: err.message || "Failed to record attendance." });
+      setTimeout(() => setVerificationResult(null), 3500);
     } finally {
       setVerifying(false);
     }
   };
 
+  // ─── Helpers ─────────────────────────────────────────────────────────────
   const getAge = (birthdate) => {
     if (!birthdate) return "N/A";
-    const today = new Date();
-    const birth = new Date(birthdate);
+    const today = new Date(), birth = new Date(birthdate);
     let age = today.getFullYear() - birth.getFullYear();
-    const monthDiff = today.getMonth() - birth.getMonth();
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
-      age--;
-    }
+    const m = today.getMonth() - birth.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
     return age;
   };
 
+  const formatDate = (d) => new Date(d).toLocaleString();
+
+  // 🟢 QR  🟡 Manual badges — add .badge-qr / .badge-manual to your CSS
+  const MethodBadge = ({ method }) =>
+    method === "manual"
+      ? <span className="badge-manual">🟡 Manual</span>
+      : <span className="badge-qr">🟢 QR Scan</span>;
+
+  // ─── Access guard ─────────────────────────────────────────────────────────
+  if (userRole !== null && userRole !== 1) {
+    return (
+      <>
+        <Navbar />
+        <div className="manual-verification-container">
+          <div className="access-denied">
+            <FaExclamationTriangle />
+            <h2>Access Denied</h2>
+            <p>Only SK Chairman can access this page.</p>
+            <button onClick={() => navigate(-1)}>Go Back</button>
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  // ─── Render ───────────────────────────────────────────────────────────────
   return (
     <>
       <Navbar />
       <div className="manual-verification-container">
-        {/* Header */}
+
+        {/* ── Header ── */}
         <div className="page-header">
-          <button className="back-btn" onClick={() => navigate(-1)}>
-            <FaArrowLeft /> Back
+          {/* Icon-only back button */}
+          <button
+            className="back-btn icon-only"
+            onClick={() => navigate(-1)}
+            title="Go back"
+            aria-label="Go back"
+          >
+            <FaArrowLeft />
           </button>
           <div className="header-text">
             <h2>Manual Verification</h2>
-            <p>Verify youth who forgot their QR code identification</p>
+            <p>Verify youth attendance when QR code is unavailable</p>
           </div>
         </div>
 
-        {/* Main Content */}
         <div className="verification-content">
-          {/* Search Section */}
+
+          {/* ── Search ── */}
           <div className="search-section">
             <div className="search-card">
-              <h3>
-                <FaSearch /> Search Youth
-              </h3>
-              <p className="search-hint">
-                Search by name, email, or contact number
-              </p>
+              <h3><FaSearch /> Search Youth</h3>
+              <p className="search-hint">Search by first name or last name</p>
+
               <div className="search-input-wrapper">
                 <FaSearch className="search-icon" />
                 <input
                   type="text"
-                  placeholder="Enter youth name, email, or contact..."
+                  placeholder="Enter youth name..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="search-input"
                 />
               </div>
 
-              {/* Search Results */}
               {isLoading && (
                 <div className="loading-results">
                   <div className="spinner-small"></div>
@@ -215,17 +350,19 @@ export default function ManualVerification() {
                     <div
                       key={youth.id}
                       className="result-item"
-                      onClick={() => setSelectedYouth(youth)}
+                      onClick={() => handleSelectYouth(youth)}
                     >
                       <div className="result-avatar">
-                        <FaUser />
+                        {youth.photo_url
+                          ? <img src={youth.photo_url} alt={youth.first_name} />
+                          : <FaUser />}
                       </div>
                       <div className="result-info">
                         <div className="result-name">
                           {youth.first_name} {youth.last_name}
                         </div>
                         <div className="result-details">
-                          <span><FaIdCard /> {youth.age || getAge(youth.birthdate)} yrs</span>
+                          <span><FaCalendarAlt /> {getAge(youth.birthdate)} yrs</span>
                           <span><FaVenusMars /> {youth.gender || "N/A"}</span>
                         </div>
                       </div>
@@ -238,19 +375,28 @@ export default function ManualVerification() {
               {searchTerm && !isLoading && searchResults.length === 0 && (
                 <div className="no-results">
                   <FaExclamationTriangle />
-                  <p>No youth found. Try a different search term.</p>
+                  <p>No youth found. Try a different name.</p>
                 </div>
               )}
             </div>
           </div>
 
-          {/* Verification Form */}
+          {/* ── Verification Form ── */}
           {selectedYouth && (
             <div className="verification-section">
               <div className="verification-card">
-                <h3>Verify Youth</h3>
-                
-                {/* Youth Details */}
+
+                <div className="card-header">
+                  <h3>Manual Verification</h3>
+                  <button
+                    className="history-btn"
+                    onClick={() => setShowHistory((v) => !v)}
+                  >
+                    <FaHistory /> {showHistory ? "Hide History" : "View History"}
+                  </button>
+                </div>
+
+                {/* ── Youth Details ── */}
                 <div className="youth-details">
                   <h4>Youth Information</h4>
                   <div className="details-grid">
@@ -265,7 +411,7 @@ export default function ManualVerification() {
                       <FaCalendarAlt className="detail-icon" />
                       <div>
                         <label>Age</label>
-                        <p>{selectedYouth.age || getAge(selectedYouth.birthdate)} years</p>
+                        <p>{getAge(selectedYouth.birthdate)} years</p>
                       </div>
                     </div>
                     <div className="detail-item">
@@ -290,106 +436,266 @@ export default function ManualVerification() {
                       </div>
                     </div>
                     <div className="detail-item">
+                      <FaMapMarkerAlt className="detail-icon" />
+                      <div>
+                        <label>Barangay</label>
+                        <p>{selectedYouth.barangay || "N/A"}</p>
+                      </div>
+                    </div>
+                    <div className="detail-item">
+                      <FaQrcode className="detail-icon" />
+                      <div>
+                        <label>QR Code</label>
+                        <p>{selectedYouth.qr_code || "Not generated"}</p>
+                      </div>
+                    </div>
+                    <div className="detail-item">
                       <FaIdCard className="detail-icon" />
                       <div>
-                        <label>Program</label>
-                        <p>{selectedYouth.programs?.program_name || "Not enrolled"}</p>
+                        <label>Registration Status</label>
+                        <p>{selectedYouth.status || "Registered"}</p>
                       </div>
                     </div>
                   </div>
                 </div>
 
-                {/* Verification Form */}
-                <div className="verification-form">
-                  <h4>Verification Details</h4>
-                  
-                  <div className="form-group">
-                    <label>Select Program *</label>
-                    <select
-                      value={selectedProgram}
-                      onChange={(e) => setSelectedProgram(e.target.value)}
-                      className="form-select"
-                    >
-                      <option value="">Choose a program</option>
-                      {programs.map((program) => (
-                        <option key={program.id} value={program.id}>
-                          {program.program_name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="form-group">
-                    <label>Verification Notes</label>
-                    <textarea
-                      placeholder="Add any additional notes about this verification..."
-                      value={verificationNote}
-                      onChange={(e) => setVerificationNote(e.target.value)}
-                      className="form-textarea"
-                      rows="3"
-                    />
-                  </div>
-
-                  <div className="info-box">
-                    <FaInfoCircle />
-                    <p>
-                      This manual verification will be recorded in the audit log.
-                      The youth will be marked as verified for the selected program.
+                {/* ── Step 1: Confirm Identity ── */}
+                {!identityConfirmed ? (
+                  <div className="identity-confirmation">
+                    <h4>Step 1 — Confirm Identity</h4>
+                    <p className="confirm-hint">
+                      Choose a method to verify this youth's identity before recording attendance.
                     </p>
-                  </div>
 
-                  <div className="verification-actions">
-                    <button
-                      onClick={() => setSelectedYouth(null)}
-                      className="btn-cancel"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={handleVerify}
-                      disabled={verifying || !selectedProgram}
-                      className="btn-verify"
-                    >
-                      {verifying ? (
-                        <>Verifying...</>
-                      ) : (
-                        <>
-                          <FaUserCheck /> Verify Youth
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </div>
+                    <div className="confirm-methods">
+                      <label className="confirm-option">
+                        <input
+                          type="radio"
+                          name="confirmMethod"
+                          value="id"
+                          checked={confirmMethod === "id"}
+                          onChange={(e) => { setConfirmMethod(e.target.value); setConfirmInput(""); }}
+                        />
+                        <span>Ask for Valid Government ID</span>
+                      </label>
+                      <label className="confirm-option">
+                        <input
+                          type="radio"
+                          name="confirmMethod"
+                          value="birthdate"
+                          checked={confirmMethod === "birthdate"}
+                          onChange={(e) => { setConfirmMethod(e.target.value); setConfirmInput(""); }}
+                        />
+                        <span>Ask Birthdate</span>
+                      </label>
+                      <label className="confirm-option">
+                        <input
+                          type="radio"
+                          name="confirmMethod"
+                          value="contact"
+                          checked={confirmMethod === "contact"}
+                          onChange={(e) => { setConfirmMethod(e.target.value); setConfirmInput(""); }}
+                        />
+                        <span>Ask Registered Contact Number</span>
+                      </label>
+                    </div>
 
-                {/* Verification Result */}
-                {verificationResult && (
-                  <div className={`verification-result ${verificationResult.success ? 'success' : 'error'}`}>
-                    {verificationResult.success ? (
-                      <FaCheckCircle className="result-icon" />
-                    ) : (
-                      <FaTimesCircle className="result-icon" />
+                    {confirmMethod === "birthdate" && (
+                      <div className="confirm-input">
+                        <label>Enter Birthdate</label>
+                        <input
+                          type="date"
+                          value={confirmInput}
+                          onChange={(e) => setConfirmInput(e.target.value)}
+                          className="form-input"
+                        />
+                      </div>
                     )}
+
+                    {confirmMethod === "contact" && (
+                      <div className="confirm-input">
+                        <label>Enter Contact Number</label>
+                        <input
+                          type="text"
+                          value={confirmInput}
+                          onChange={(e) => setConfirmInput(e.target.value)}
+                          placeholder="Enter registered contact number"
+                          className="form-input"
+                        />
+                      </div>
+                    )}
+
+                    <div className="verification-actions">
+                      <button onClick={() => setSelectedYouth(null)} className="btn-cancel">
+                        Cancel
+                      </button>
+                      <button
+                        onClick={handleConfirmIdentity}
+                        className="btn-confirm"
+                        disabled={!confirmMethod}
+                      >
+                        <FaClipboardCheck /> Confirm Identity
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="identity-confirmed">
+                    <FaCheckCircle />
+                    <span>Identity confirmed — proceed to record attendance</span>
+                  </div>
+                )}
+
+                {/* ── Step 2: Record Attendance ── */}
+                {identityConfirmed && (
+                  <div className="verification-form">
+                    <h4>Step 2 — Record Attendance</h4>
+
+                    <div className="form-group">
+                      <label>Select Program / Event *</label>
+                      <select
+                        value={selectedProgram}
+                        onChange={async (e) => {
+                          setSelectedProgram(e.target.value);
+                          const att = await checkTodayAttendance(selectedYouth.id, e.target.value);
+                          setTodayAttendance(att);
+                        }}
+                        className="form-select"
+                      >
+                        <option value="">Choose a program / event</option>
+                        {programs.map((p) => (
+                          <option key={p.id} value={p.id}>{p.program_name}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {todayAttendance && (
+                      <div className="warning-box">
+                        <FaExclamationTriangle />
+                        <p>
+                          Already marked as present today&nbsp;
+                          <MethodBadge method={todayAttendance.method} />
+                        </p>
+                      </div>
+                    )}
+
+                    <div className="form-group">
+                      <label>Reason for Manual Verification *</label>
+                      <select
+                        value={selectedReason}
+                        onChange={(e) => setSelectedReason(e.target.value)}
+                        className="form-select"
+                      >
+                        <option value="">Select reason</option>
+                        <option value="Forgot QR">Forgot QR Code</option>
+                        <option value="Phone issue">Phone Issue / Dead Battery</option>
+                        <option value="QR scanner issue">QR Scanner Technical Issue</option>
+                        <option value="Lost QR">Lost QR Code</option>
+                        <option value="Other">Other</option>
+                      </select>
+                    </div>
+
+                    {selectedReason === "Other" && (
+                      <div className="form-group">
+                        <label>Specify Reason *</label>
+                        <input
+                          type="text"
+                          value={customReason}
+                          onChange={(e) => setCustomReason(e.target.value)}
+                          placeholder="Describe the reason..."
+                          className="form-input"
+                        />
+                      </div>
+                    )}
+
+                    <div className="form-group">
+                      <label>Additional Notes (Optional)</label>
+                      <textarea
+                        placeholder="Any additional context about this verification..."
+                        value={verificationNote}
+                        onChange={(e) => setVerificationNote(e.target.value)}
+                        className="form-textarea"
+                        rows="3"
+                      />
+                    </div>
+
+                    <div className="info-box">
+                      <FaInfoCircle />
+                      <p>
+                        This will be saved to the <strong>attendance</strong> table
+                        with method <strong>"manual"</strong> and logged in the audit trail.
+                      </p>
+                    </div>
+
+                    <div className="verification-actions">
+                      <button onClick={() => setSelectedYouth(null)} className="btn-cancel">
+                        Cancel
+                      </button>
+                      <button
+                        onClick={handleMarkAttendance}
+                        disabled={
+                          verifying ||
+                          !selectedProgram ||
+                          !selectedReason ||
+                          (selectedReason === "Other" && !customReason) ||
+                          !!todayAttendance
+                        }
+                        className="btn-verify"
+                      >
+                        {verifying ? "Processing..." : <><FaSave /> Mark as Present</>}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* ── Result ── */}
+                {verificationResult && (
+                  <div className={`verification-result ${verificationResult.success ? "success" : "error"}`}>
+                    {verificationResult.success
+                      ? <FaCheckCircle className="result-icon" />
+                      : <FaTimesCircle className="result-icon" />}
                     <p>{verificationResult.message}</p>
                   </div>
                 )}
+
+                {/* ── History ── */}
+                {showHistory && (
+                  <div className="history-section">
+                    <h4>Manual Verification History</h4>
+                    {verificationHistory.length === 0 ? (
+                      <p className="no-history">No manual verification history found.</p>
+                    ) : (
+                      <div className="history-list">
+                        {verificationHistory.map((log, i) => (
+                          <div key={i} className="history-item">
+                            <div className="history-date">{formatDate(log.created_at)}</div>
+                            <div className="history-details">{log.details}</div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
               </div>
             </div>
           )}
         </div>
 
-        {/* Help Section */}
+        {/* ── Guidelines ── */}
         <div className="help-section">
           <div className="help-card">
             <h4>Manual Verification Guidelines</h4>
             <ul>
-              <li>Verify the youth's identity using valid government ID or barangay ID</li>
+              <li>Verify identity using a valid government ID, birthdate, or registered contact number</li>
               <li>Ensure the youth is registered in the system before proceeding</li>
-              <li>Select the correct program they are participating in</li>
-              <li>Add notes about why QR code verification wasn't possible</li>
-              <li>All manual verifications are logged for audit purposes</li>
+              <li>Select the correct program / event they are attending</li>
+              <li>Always select a reason — required for audit and accountability</li>
+              <li>All manual verifications are saved to the <strong>attendance</strong> table with method <em>"manual"</em></li>
+              <li>The system prevents duplicate attendance entries for the same program on the same day</li>
             </ul>
           </div>
         </div>
+
       </div>
     </>
   );

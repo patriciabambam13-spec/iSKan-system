@@ -3,7 +3,7 @@
 .dashboard-layout {
   display: flex;
   min-height: calc(100vh - 60px);
-  background: #f3eee4;
+  background: #FFFBF2;
 }
 
 /* SIDEBAR */

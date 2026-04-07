@@ -1,65 +1,62 @@
 /* AUDIT LOGS PAGE - Scoped styles */
 .audit-container {
-  background: #f3eee4;
+  background: #FFFBF2;
   min-height: calc(100vh - 60px);
   padding: 20px 30px;
 }
 
-/* Header */
-.audit-header {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-  padding: 16px 24px;
-  background: white;
-  border-radius: 12px;
+/* FIXED: Clean Header with White Background and Inline Layout */
+.audit-page-header {
   margin-bottom: 24px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
-.audit-header .back-btn {
-  width: 40px;
-  height: 40px;
+.clean-header {
+  background: white;
+  padding: 15px 20px;
+  border-radius: 10px;
   display: flex;
   align-items: center;
-  justify-content: center;
-  background: #f1f5f9;
-  border: none;
-  border-radius: 10px;
-  font-size: 20px;
-  cursor: pointer;
-  color: #0f2d44;
-  transition: all 0.2s ease;
+  gap: 15px;
+  justify-content: space-between;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
 }
 
-.audit-header .back-btn:hover {
-  background: #e2e8f0;
-  transform: translateX(-2px);
-}
-
-.audit-header .header-text {
+.header-inline {
   flex: 1;
 }
 
-.audit-header .header-text h2 {
+.header-inline h2 {
   margin: 0;
-  font-size: 24px;
+  font-size: 20px;
   font-weight: 600;
   color: #0f2d44;
 }
 
-.audit-header .header-text p {
-  margin: 4px 0 0;
-  color: #64748b;
-  font-size: 14px;
+.back-btn {
+  background: #f0f0f0;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 18px;
+  transition: all 0.2s ease;
+  color: #0f2d44;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.audit-header .refresh-btn {
-  padding: 10px 20px;
+.back-btn:hover {
+  background: #e0a800;
+  transform: translateX(-2px);
+}
+
+.refresh-btn {
   background: #0f2d44;
   color: white;
   border: none;
-  border-radius: 8px;
+  padding: 8px 16px;
+  border-radius: 6px;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -69,7 +66,7 @@
   transition: all 0.2s ease;
 }
 
-.audit-header .refresh-btn:hover {
+.refresh-btn:hover {
   background: #1a3f5a;
   transform: translateY(-2px);
 }
@@ -82,7 +79,7 @@
   margin-bottom: 24px;
 }
 
-.audit-stats-grid .stat-card {
+.stat-card {
   background: white;
   padding: 20px;
   border-radius: 12px;
@@ -93,12 +90,12 @@
   transition: all 0.2s ease;
 }
 
-.audit-stats-grid .stat-card:hover {
+.stat-card:hover {
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
-.audit-stats-grid .stat-icon {
+.stat-icon {
   width: 50px;
   height: 50px;
   border-radius: 12px;
@@ -106,43 +103,25 @@
   align-items: center;
   justify-content: center;
   font-size: 24px;
+  background: #fef9e6;
+  color: #f2b705;
 }
 
-.audit-stats-grid .stat-icon.blue {
-  background: #dbeafe;
-  color: #3b82f6;
-}
-
-.audit-stats-grid .stat-icon.green {
-  background: #d1fae5;
-  color: #10b981;
-}
-
-.audit-stats-grid .stat-icon.orange {
-  background: #fed7aa;
-  color: #f59e0b;
-}
-
-.audit-stats-grid .stat-icon.purple {
-  background: #e9d5ff;
-  color: #8b5cf6;
-}
-
-.audit-stats-grid .stat-info h3 {
+.stat-info h3 {
   font-size: 28px;
   font-weight: 700;
   margin: 0 0 4px;
   color: #0f2d44;
 }
 
-.audit-stats-grid .stat-info p {
+.stat-info p {
   font-size: 13px;
   color: #64748b;
   margin: 0;
 }
 
-/* Filters Section */
-.filters-section {
+/* Filter Section */
+.filter-section {
   background: white;
   padding: 20px 24px;
   border-radius: 12px;
@@ -150,7 +129,7 @@
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
-.filters-header {
+.filter-header {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -159,48 +138,35 @@
   border-bottom: 1px solid #e2e8f0;
 }
 
-.filters-header .filter-icon {
+.filter-header .filter-icon {
   color: #f2b705;
   font-size: 18px;
 }
 
-.filters-header span {
+.filter-header span {
   font-size: 15px;
   font-weight: 600;
   color: #0f2d44;
 }
 
-.filters-row {
+.filters-wrapper {
   display: flex;
   gap: 20px;
   align-items: flex-end;
   flex-wrap: wrap;
 }
 
-.filter-group {
-  flex: 1;
+.filter-item {
+  flex: 2;
   min-width: 150px;
 }
 
-.filter-group label {
+.filter-item label {
   font-size: 13px;
   font-weight: 600;
   color: #0f2d44;
   margin-bottom: 8px;
   display: block;
-}
-
-.search-wrapper {
-  position: relative;
-}
-
-.search-icon {
-  position: absolute;
-  left: 12px;
-  top: 50%;
-  transform: translateY(-50%);
-  color: #94a3b8;
-  font-size: 14px;
 }
 
 .filter-input,
@@ -217,10 +183,6 @@
   box-sizing: border-box;
 }
 
-.search-wrapper .filter-input {
-  padding-left: 36px;
-}
-
 .filter-input:hover,
 .filter-select:hover {
   border-color: #f2b705;
@@ -234,7 +196,12 @@
   background: #fffef5;
 }
 
-.filter-actions {
+.filter-buttons {
+  flex: 0.5;
+  min-width: auto;
+}
+
+.button-group {
   display: flex;
   gap: 12px;
 }
@@ -280,8 +247,8 @@
   box-shadow: 0 4px 12px rgba(15, 45, 68, 0.2);
 }
 
-/* Logs Table */
-.logs-table-container {
+/* Table Container */
+.table-container {
   background: white;
   border-radius: 12px;
   overflow-x: auto;
@@ -317,23 +284,6 @@
   background: #fef9e6;
 }
 
-.timestamp {
-  font-family: monospace;
-  font-size: 12px;
-  white-space: nowrap;
-}
-
-.user-info {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.user-icon {
-  font-size: 12px;
-  color: #94a3b8;
-}
-
 /* Action Badges */
 .badge-action {
   display: inline-block;
@@ -341,6 +291,7 @@
   border-radius: 6px;
   font-size: 11px;
   font-weight: 700;
+  text-transform: uppercase;
 }
 
 .badge-action.create {
@@ -358,25 +309,17 @@
   color: #991b1b;
 }
 
-.badge-action.override {
-  background: #fed7aa;
-  color: #92400e;
-}
-
 .badge-action.default {
   background: #f1f5f9;
   color: #475569;
 }
 
-.table-name {
-  font-family: monospace;
-  font-size: 12px;
-  background: #f1f5f9;
-  padding: 4px 8px;
-  border-radius: 4px;
+.details-cell {
+  max-width: 250px;
+  word-break: break-word;
 }
 
-.record-id {
+code {
   font-family: monospace;
   font-size: 11px;
   background: #f8fafc;
@@ -384,13 +327,28 @@
   border-radius: 4px;
 }
 
-.details-cell {
-  max-width: 250px;
+/* Empty Row */
+.empty-row {
+  text-align: center;
+  padding: 60px !important;
+  color: #94a3b8;
 }
 
-.details-preview {
-  font-size: 12px;
+.empty-row svg {
+  font-size: 48px;
+  margin-bottom: 16px;
+  color: #cbd5e1;
+}
+
+.empty-row p {
+  margin: 0 0 8px;
+  font-size: 16px;
   color: #64748b;
+}
+
+.empty-row small {
+  font-size: 12px;
+  color: #94a3b8;
 }
 
 /* Pagination */
@@ -406,14 +364,15 @@
 }
 
 .page-btn {
-  padding: 8px 12px;
+  padding: 8px 16px;
   background: #f1f5f9;
   border: none;
   border-radius: 6px;
   cursor: pointer;
   display: flex;
   align-items: center;
-  justify-content: center;
+  gap: 8px;
+  font-size: 14px;
   transition: all 0.2s ease;
 }
 
@@ -466,30 +425,22 @@
   font-size: 14px;
 }
 
-/* Empty State */
-.empty-state {
-  text-align: center;
-  padding: 60px;
-  color: #94a3b8;
-}
-
-.empty-state svg {
-  font-size: 48px;
-  margin-bottom: 16px;
-}
-
-/* Responsive */
+/* Responsive Design */
 @media (max-width: 1024px) {
   .audit-stats-grid {
     grid-template-columns: repeat(2, 1fr);
   }
   
-  .filters-row {
+  .filters-wrapper {
     flex-direction: column;
     align-items: stretch;
   }
   
-  .filter-actions {
+  .filter-buttons {
+    flex: auto;
+  }
+  
+  .button-group {
     justify-content: flex-end;
   }
 }
@@ -499,8 +450,7 @@
     padding: 12px 16px;
   }
   
-  .audit-header {
-    flex-wrap: wrap;
+  .clean-header {
     padding: 12px 16px;
   }
   
@@ -508,8 +458,49 @@
     gap: 12px;
   }
   
+  .stat-card {
+    padding: 15px;
+  }
+  
+  .stat-info h3 {
+    font-size: 22px;
+  }
+  
   .logs-table th,
   .logs-table td {
     padding: 10px 12px;
+  }
+  
+  .button-group {
+    flex-direction: column;
+  }
+  
+  .btn-outline,
+  .btn-primary {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 640px) {
+  .audit-stats-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .clean-header {
+    flex-wrap: wrap;
+  }
+  
+  .header-inline {
+    order: 2;
+    text-align: center;
+  }
+  
+  .back-btn {
+    order: 1;
+  }
+  
+  .refresh-btn {
+    order: 3;
   }
 }

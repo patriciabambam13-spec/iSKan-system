@@ -17,17 +17,17 @@ export default function AuditLogs() {
   const [filteredLogs, setFilteredLogs] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Filters
+  // filters
   const [searchTerm, setSearchTerm] = useState("");
   const [actionType, setActionType] = useState("");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
 
-  // Pagination
+  // pagination
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
-  // Stats
+  // stats
   const [stats, setStats] = useState({
     total: 0,
     today: 0,
@@ -35,7 +35,7 @@ export default function AuditLogs() {
     uniqueUsers: 0
   });
 
-  // 🔥 FETCH DATA FROM SUPABASE
+  // fetch audit logs from supabase
   const fetchAuditLogs = async () => {
     setIsLoading(true);
     try {
@@ -53,27 +53,21 @@ export default function AuditLogs() {
       setLogs(logsData);
       setFilteredLogs(logsData);
 
-      // 📊 Stats
+      // calculate stats
       const today = format(new Date(), "yyyy-MM-dd");
-
-      const todayLogs = logsData.filter(
-        l => l.created_at?.startsWith(today)
-      );
-
+      const todayLogs = logsData.filter(l => l.created_at?.startsWith(today));
+      
       const weekAgo = new Date();
       weekAgo.setDate(weekAgo.getDate() - 7);
-
-      const weekLogs = logsData.filter(
-        l => new Date(l.created_at) >= weekAgo
-      );
-
+      const weekLogs = logsData.filter(l => new Date(l.created_at) >= weekAgo);
+      
       const uniqueUsers = new Set(logsData.map(l => l.user_id)).size;
 
       setStats({
         total: logsData.length,
         today: todayLogs.length,
         thisWeek: weekLogs.length,
-        uniqueUsers
+        uniqueUsers: uniqueUsers
       });
 
     } catch (error) {
@@ -85,9 +79,25 @@ export default function AuditLogs() {
 
   useEffect(() => {
     fetchAuditLogs();
+    
+    // real-time subscription for new logs
+    const subscription = supabase
+      .channel('audit_logs_changes')
+      .on('postgres_changes', 
+        { event: 'INSERT', schema: 'public', table: 'audit_logs' },
+        (payload) => {
+          setLogs(prev => [payload.new, ...prev]);
+          setFilteredLogs(prev => [payload.new, ...prev]);
+        }
+      )
+      .subscribe();
+      
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
-  // 🔍 FILTERING LOGIC
+  // filter logic
   useEffect(() => {
     let filtered = [...logs];
 
@@ -96,7 +106,9 @@ export default function AuditLogs() {
         (log.action || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
         (log.table_name || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
         (log.record_id || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (log.details || "").toLowerCase().includes(searchTerm.toLowerCase())
+        (log.details || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+        // FIXED: Use users.email instead of non-existent user_email
+        (log.users?.email || "").toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
 
@@ -105,34 +117,38 @@ export default function AuditLogs() {
     }
 
     if (fromDate) {
-      filtered = filtered.filter(
-        log => log.created_at?.slice(0, 10) >= fromDate
-      );
+      filtered = filtered.filter(log => log.created_at?.slice(0, 10) >= fromDate);
     }
 
     if (toDate) {
-      filtered = filtered.filter(
-        log => log.created_at?.slice(0, 10) <= toDate
-      );
+      filtered = filtered.filter(log => log.created_at?.slice(0, 10) <= toDate);
     }
 
     setFilteredLogs(filtered);
     setCurrentPage(1);
   }, [searchTerm, actionType, fromDate, toDate, logs]);
 
-  // 📄 PAGINATION
+  // pagination
   const totalPages = Math.ceil(filteredLogs.length / itemsPerPage);
   const currentLogs = filteredLogs.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
 
-  // 🎨 BADGE
+  // action badge styling
   const getActionBadge = (action) => {
-    return <span className={`badge-action ${action?.toLowerCase()}`}>{action}</span>;
+    const actionLower = action?.toLowerCase();
+    let badgeClass = "badge-action ";
+    
+    if (actionLower === "create") badgeClass += "create";
+    else if (actionLower === "update") badgeClass += "update";
+    else if (actionLower === "delete") badgeClass += "delete";
+    else badgeClass += "default";
+    
+    return <span className={badgeClass}>{action}</span>;
   };
 
-  // 📥 EXPORT CSV
+  // export to csv
   const exportToCSV = () => {
     if (filteredLogs.length === 0) {
       alert("No data to export");
@@ -143,6 +159,7 @@ export default function AuditLogs() {
 
     const rows = filteredLogs.map(log => [
       log.created_at ? format(new Date(log.created_at), "yyyy-MM-dd HH:mm:ss") : "",
+      // FIXED: Use users.email instead of user_email
       log.users?.email || "Unknown",
       log.action || "",
       log.table_name || "",
@@ -177,115 +194,191 @@ export default function AuditLogs() {
       <Navbar />
 
       <div className="audit-container">
-        {/* HEADER */}
-        <div className="audit-header">
-          <button onClick={() => navigate(-1)}>←</button>
-          <h2>Audit Logs</h2>
-          <button onClick={fetchAuditLogs}>
+        {/* FIXED: Header with white rectangular background and inline layout */}
+        <div className="audit-page-header clean-header">
+          <button className="back-btn" onClick={() => navigate(-1)}>
+            ←
+          </button>
+
+          <div className="header-inline">
+            <h2>Audit Logs</h2>
+          </div>
+
+          <button className="refresh-btn" onClick={fetchAuditLogs}>
             <FaSync /> Refresh
           </button>
         </div>
 
-        {/* STATS */}
+        {/* stats cards */}
         <div className="audit-stats-grid">
           <div className="stat-card">
-            <FaDatabase /> {stats.total} Total
+            <div className="stat-icon"><FaDatabase /></div>
+            <div className="stat-info">
+              <h3>{stats.total}</h3>
+              <p>Total Logs</p>
+            </div>
           </div>
           <div className="stat-card">
-            <FaCalendarAlt /> {stats.today} Today
+            <div className="stat-icon"><FaCalendarAlt /></div>
+            <div className="stat-info">
+              <h3>{stats.today}</h3>
+              <p>Today</p>
+            </div>
           </div>
           <div className="stat-card">
-            <FaClock /> {stats.thisWeek} Week
+            <div className="stat-icon"><FaClock /></div>
+            <div className="stat-info">
+              <h3>{stats.thisWeek}</h3>
+              <p>This Week</p>
+            </div>
           </div>
           <div className="stat-card">
-            <FaUser /> {stats.uniqueUsers} Users
+            <div className="stat-icon"><FaUser /></div>
+            <div className="stat-info">
+              <h3>{stats.uniqueUsers}</h3>
+              <p>Unique Users</p>
+            </div>
           </div>
         </div>
 
-        {/* FILTERS */}
-        <div className="filters-section">
-          <input
-            placeholder="Search..."
-            value={searchTerm}
-            onChange={e => setSearchTerm(e.target.value)}
-          />
+        {/* filters section */}
+        <div className="filter-section">
+          <div className="filter-header">
+            <FaFilter className="filter-icon" />
+            <span>Filter Criteria</span>
+          </div>
 
-          <select value={actionType} onChange={e => setActionType(e.target.value)}>
-            <option value="">All</option>
-            <option value="CREATE">CREATE</option>
-            <option value="UPDATE">UPDATE</option>
-            <option value="DELETE">DELETE</option>
-          </select>
+          <div className="filters-wrapper">
+            <div className="filter-item">
+              <label>Search</label>
+              <input
+                type="text"
+                placeholder="Search logs..."
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                className="filter-input"
+              />
+            </div>
 
-          <input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} />
-          <input type="date" value={toDate} onChange={e => setToDate(e.target.value)} />
+            <div className="filter-item">
+              <label>Action Type</label>
+              <select
+                value={actionType}
+                onChange={e => setActionType(e.target.value)}
+                className="filter-select"
+              >
+                <option value="">All Actions</option>
+                <option value="CREATE">CREATE</option>
+                <option value="UPDATE">UPDATE</option>
+                <option value="DELETE">DELETE</option>
+              </select>
+            </div>
 
-          <button onClick={clearFilters}>Clear</button>
-          <button onClick={exportToCSV}>
-            <FaDownload /> Export
-          </button>
+            <div className="filter-item">
+              <label>From Date</label>
+              <input
+                type="date"
+                value={fromDate}
+                onChange={e => setFromDate(e.target.value)}
+                className="filter-input"
+              />
+            </div>
+
+            <div className="filter-item">
+              <label>To Date</label>
+              <input
+                type="date"
+                value={toDate}
+                onChange={e => setToDate(e.target.value)}
+                className="filter-input"
+              />
+            </div>
+
+            <div className="filter-item filter-buttons">
+              <label>&nbsp;</label>
+              <div className="button-group">
+                <button onClick={clearFilters} className="btn-outline">
+                  Clear Filters
+                </button>
+                <button onClick={exportToCSV} className="btn-primary">
+                  <FaDownload /> Export CSV
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
 
-        {/* TABLE */}
+        {/* logs table */}
         {isLoading ? (
-          <p>Loading...</p>
+          <div className="loading-state">
+            <div className="spinner"></div>
+            <p>Loading audit logs...</p>
+          </div>
         ) : (
-          <table className="logs-table">
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>User</th>
-                <th>Action</th>
-                <th>Table</th>
-                <th>ID</th>
-                <th>Details</th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {currentLogs.length > 0 ? (
-                currentLogs.map((log, i) => (
-                  <tr key={i}>
-                    <td>
-                      {log.created_at
-                        ? format(new Date(log.created_at), "MMM dd, yyyy HH:mm")
-                        : "-"}
-                    </td>
-                    <td>{log.users?.email || "Unknown"}</td>
-                    <td>{getActionBadge(log.action)}</td>
-                    <td>{log.table_name}</td>
-                    <td>{log.record_id}</td>
-                    <td>{log.details}</td>
-                  </tr>
-                ))
-              ) : (
+          <div className="table-container">
+            <table className="logs-table">
+              <thead>
                 <tr>
-                  <td colSpan="6">
-                    <FaExclamationTriangle /> No logs found
-                  </td>
+                  <th>Date & Time</th>
+                  <th>User</th>
+                  <th>Action</th>
+                  <th>Table</th>
+                  <th>Record ID</th>
+                  <th>Details</th>
                 </tr>
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {currentLogs.length > 0 ? (
+                  currentLogs.map((log, index) => (
+                    <tr key={log.id || index}>
+                      <td>
+                        {log.created_at
+                          ? format(new Date(log.created_at), "MMM dd, yyyy HH:mm:ss")
+                          : "-"}
+                      </td>
+                      {/* FIXED: Use users.email instead of user_email */}
+                      <td>{log.users?.email || "Unknown"}</td>
+                      <td>{getActionBadge(log.action)}</td>
+                      <td>{log.table_name || "-"}</td>
+                      <td><code>{log.record_id || "-"}</code></td>
+                      <td className="details-cell">{log.details || "-"}</td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan="6" className="empty-row">
+                      <FaExclamationTriangle />
+                      <p>No audit logs found</p>
+                      <small>Logs will appear here when users perform actions</small>
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         )}
 
-        {/* PAGINATION */}
+        {/* pagination */}
         {totalPages > 1 && (
           <div className="pagination">
             <button
+              className="page-btn"
               disabled={currentPage === 1}
               onClick={() => setCurrentPage(p => p - 1)}
             >
-              <FaChevronLeft />
+              <FaChevronLeft /> Previous
             </button>
-
-            <span>{currentPage} / {totalPages}</span>
-
+            
+            <span className="page-info">
+              Page {currentPage} of {totalPages}
+            </span>
+            
             <button
+              className="page-btn"
               disabled={currentPage === totalPages}
               onClick={() => setCurrentPage(p => p + 1)}
             >
-              <FaChevronRight />
+              Next <FaChevronRight />
             </button>
           </div>
         )}

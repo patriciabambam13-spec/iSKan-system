@@ -4,6 +4,7 @@ import { useNavigate, Link } from "react-router-dom";
 import "../styles/login.css";
 import { FaEye, FaEyeSlash } from "react-icons/fa";
 import toast from "react-hot-toast";
+import { logActivity } from "../utils/logActivity";
 
 import skLogo from "../assets/sk-logo.png";
 import skbg from "../assets/sk-bg.png";
@@ -27,6 +28,12 @@ function Login() {
 
     if (loginAttempts >= 3) {
       toast.error("Too many incorrect attempts. Please contact the IT administrator.");
+      await logActivity({
+        action: "LOGIN_BLOCKED",
+        table: "auth",
+        recordId: null,
+        details: `Login blocked for email: ${email} - exceeded maximum attempts`
+      });
       return;
     }
 
@@ -39,6 +46,13 @@ function Login() {
 
       const newAttempts = loginAttempts + 1;
       setLoginAttempts(newAttempts);
+
+      await logActivity({
+        action: "LOGIN_FAILED",
+        table: "auth",
+        recordId: null,
+        details: `Failed login attempt ${newAttempts} of 3 for email: ${email}`
+      });
 
       if (newAttempts >= 3) {
         toast.error("Login failed 3 times. Please contact the IT administrator using Forgot Password.");
@@ -58,6 +72,13 @@ function Login() {
       .select("role_id")
       .eq("user_id", user.id)
       .single();
+
+    await logActivity({
+      action: "LOGIN_SUCCESS",
+      table: "auth",
+      recordId: user.id,
+      details: `User ${email} logged in successfully with role_id: ${userData?.role_id}`
+    });
 
     setTimeout(() => {
       if (userData.role_id === 1) {

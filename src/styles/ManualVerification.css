@@ -1,6 +1,6 @@
 /* MANUAL VERIFICATION PAGE */
 .manual-verification-container {
-  background: #f3eee4;
+  background: #FFFBF2;
   min-height: calc(100vh - 60px);
   padding: 20px 30px;
 }
@@ -65,6 +65,47 @@
   padding: 24px;
   border-radius: 12px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  border: 1px solid #f1f5f9;
+}
+
+/* Card Header with History Button */
+.manual-verification-container .card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.manual-verification-container .card-header h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: #0f2d44;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.manual-verification-container .history-btn {
+  padding: 6px 12px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #64748b;
+  transition: all 0.2s ease;
+}
+
+.manual-verification-container .history-btn:hover {
+  background: #fef9e6;
+  border-color: #f2b705;
+  color: #0f2d44;
 }
 
 .manual-verification-container .search-card h3,
@@ -157,6 +198,13 @@
   justify-content: center;
   color: #f2b705;
   font-size: 18px;
+  overflow: hidden;
+}
+
+.manual-verification-container .result-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .manual-verification-container .result-info {
@@ -262,6 +310,212 @@
   margin: 0;
 }
 
+/* Identity Confirmation */
+.manual-verification-container .identity-confirmation {
+  margin-bottom: 24px;
+  padding: 16px;
+  background: #fef9e6;
+  border-radius: 8px;
+  border-left: 3px solid #f2b705;
+}
+
+.manual-verification-container .identity-confirmation h4 {
+  font-size: 14px;
+  font-weight: 600;
+  color: #0f2d44;
+  margin-bottom: 8px;
+}
+
+.manual-verification-container .confirm-hint {
+  font-size: 12px;
+  color: #64748b;
+  margin-bottom: 16px;
+}
+
+.manual-verification-container .confirm-methods {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.manual-verification-container .confirm-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  font-size: 13px;
+  color: #0f2d44;
+}
+
+.manual-verification-container .confirm-option input {
+  cursor: pointer;
+}
+
+.manual-verification-container .confirm-input {
+  margin-bottom: 16px;
+}
+
+.manual-verification-container .confirm-input label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: #0f2d44;
+  margin-bottom: 6px;
+}
+
+.manual-verification-container .confirm-input input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #d16a3c;
+  border-radius: 8px;
+  font-size: 14px;
+  background: #f6f3d1;
+}
+
+.manual-verification-container .btn-confirm {
+  width: 100%;
+  padding: 10px;
+  background: #f2b705;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #0f2d44;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.2s ease;
+}
+
+.manual-verification-container .btn-confirm:hover:not(:disabled) {
+  background: #e0a800;
+  transform: translateY(-2px);
+}
+
+.manual-verification-container .btn-confirm:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Identity Confirmed Badge */
+.manual-verification-container .identity-confirmed {
+  margin-bottom: 24px;
+  padding: 12px;
+  background: #d1fae5;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #065f46;
+  font-weight: 500;
+  font-size: 14px;
+}
+
+.manual-verification-container .identity-confirmed svg {
+  font-size: 20px;
+}
+
+/* Warning Box */
+.manual-verification-container .warning-box {
+  background: #fee2e2;
+  border-left: 3px solid #dc2626;
+  padding: 12px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.manual-verification-container .warning-box svg {
+  color: #dc2626;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.manual-verification-container .warning-box p {
+  font-size: 12px;
+  color: #991b1b;
+  margin: 0;
+}
+
+/* History Section */
+.manual-verification-container .history-section {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.manual-verification-container .history-section h4 {
+  font-size: 14px;
+  font-weight: 600;
+  color: #0f2d44;
+  margin-bottom: 12px;
+}
+
+.manual-verification-container .history-list {
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.manual-verification-container .history-item {
+  padding: 10px;
+  background: #f8fafc;
+  border-radius: 6px;
+  margin-bottom: 8px;
+}
+
+.manual-verification-container .history-date {
+  font-size: 10px;
+  color: #94a3b8;
+  margin-bottom: 4px;
+}
+
+.manual-verification-container .history-details {
+  font-size: 12px;
+  color: #0f2d44;
+}
+
+/* Access Denied */
+.manual-verification-container .access-denied {
+  text-align: center;
+  padding: 60px 40px;
+  background: white;
+  border-radius: 12px;
+  max-width: 500px;
+  margin: 60px auto;
+}
+
+.manual-verification-container .access-denied svg {
+  font-size: 64px;
+  color: #dc2626;
+  margin-bottom: 20px;
+}
+
+.manual-verification-container .access-denied h2 {
+  font-size: 24px;
+  color: #0f2d44;
+  margin-bottom: 12px;
+}
+
+.manual-verification-container .access-denied p {
+  color: #64748b;
+  margin-bottom: 24px;
+}
+
+.manual-verification-container .access-denied button {
+  padding: 10px 24px;
+  background: #0f2d44;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
 /* Verification Form */
 .manual-verification-container .verification-form h4 {
   font-size: 14px;
@@ -283,7 +537,8 @@
 }
 
 .manual-verification-container .form-select,
-.manual-verification-container .form-textarea {
+.manual-verification-container .form-textarea,
+.manual-verification-container .form-input {
   width: 100%;
   padding: 10px 12px;
   border: 1px solid #d16a3c;
@@ -294,7 +549,8 @@
 }
 
 .manual-verification-container .form-select:focus,
-.manual-verification-container .form-textarea:focus {
+.manual-verification-container .form-textarea:focus,
+.manual-verification-container .form-input:focus {
   outline: none;
   border-color: #f2b705;
   box-shadow: 0 0 0 3px rgba(242, 183, 5, 0.1);
@@ -354,18 +610,18 @@
 }
 
 .manual-verification-container .btn-verify {
-  background: #0f2d44;
+  background: #f2b705;
   border: none;
-  color: white;
+  color: #0f2d44;
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
 .manual-verification-container .btn-verify:hover:not(:disabled) {
-  background: #1a3f5a;
+  background: #e0a800;
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(15, 45, 68, 0.2);
+  box-shadow: 0 4px 12px rgba(242, 183, 5, 0.3);
 }
 
 .manual-verification-container .btn-verify:disabled {
@@ -475,5 +731,15 @@
   .manual-verification-container .btn-verify {
     width: 100%;
     justify-content: center;
+  }
+  
+  .manual-verification-container .card-header {
+    flex-direction: column;
+    gap: 12px;
+    align-items: flex-start;
+  }
+  
+  .manual-verification-container .confirm-methods {
+    gap: 8px;
   }
 }

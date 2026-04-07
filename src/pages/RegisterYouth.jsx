@@ -6,6 +6,7 @@ import { QRCodeCanvas } from "qrcode.react";
 import { FaPrint, FaDownload, FaUserPlus } from "react-icons/fa";
 import Webcam from "react-webcam";
 import emailjs from "emailjs-com";
+import { logActivity } from "../utils/logActivity";
 import "../styles/registerYouth.css";
 
 export default function RegisterYouth() {
@@ -316,6 +317,14 @@ export default function RegisterYouth() {
         return;
       }
 
+      // Log successful registration
+      await logActivity({
+        action: "CREATE",
+        table: "youth",
+        recordId: data.id,
+        details: `New youth registered: ${formData.first_name} ${formData.last_name} with ID: ${youthID}`
+      });
+
       setQrCode(youthID);
       setShowQR(true);
       
@@ -329,6 +338,14 @@ export default function RegisterYouth() {
       
     } catch(err){
       console.error("Unexpected error:", err);
+      
+      await logActivity({
+        action: "CREATE_ERROR",
+        table: "youth",
+        recordId: null,
+        details: `Failed to register youth: ${err.message}`
+      });
+      
       alert("Unexpected error occurred: " + err.message);
       setIsSubmitting(false);
     }
