@@ -1,46 +1,23 @@
 import { FaBell, FaCog, FaSignOutAlt, FaSearch } from "react-icons/fa";
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import skLogo from "../assets/sk-logo.png";
 import "../styles/navbar.css";
-import { supabase } from "../services/supabaseClient";
 
 export default function Navbar() {
-  const [user, setUser] = useState(null);
+  const user = JSON.parse(localStorage.getItem("user")) || {
+    name: "User",
+    role: "chairman"
+  };
 
-  useEffect(() => {
-    const { data: authListener } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        const currentUser = session?.user;
-        if (currentUser) {
-          // The user object from Supabase has `user_metadata` which is where you'd store custom fields like name and role.
-          setUser({
-            name: currentUser.user_metadata?.name || currentUser.email, // Fallback to email if name is not in metadata
-            role: currentUser.user_metadata?.role || "kagawad", // Default to 'kagawad' if role is not set
-          });
-        } else {
-          setUser(null);
-        }
-      }
-    );
-
-    return () => {
-      // Cleanup the subscription when the component unmounts
-      authListener?.subscription.unsubscribe();
-    };
-  }, []);
-
-  async function logout() {
-    const { error } = await supabase.auth.signOut();
-    if (error) {
-      console.error("Error logging out:", error.message);
-    }
-    // Redirect to home/login page. The onAuthStateChange listener will handle clearing user state.
+  function logout(){
+    localStorage.removeItem("user");
     window.location.href = "/";
   }
 
   function Settings(){
     window.location.href = "/settings";
   }
+
   // State to track if the drawer is visible
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
 
@@ -96,7 +73,7 @@ export default function Navbar() {
 
           <div className="user-section">
             <div className="user-avatar">
-              {user.name.charAt(0).toUpperCase()}
+              {user.name.charAt(0)}
             </div>
 
             <div className="user-info">
