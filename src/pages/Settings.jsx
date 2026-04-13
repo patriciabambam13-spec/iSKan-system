@@ -5,7 +5,6 @@ import { logActivity } from "../utils/logActivity";
 import "../styles/settings.css";
 import toast, { Toaster } from "react-hot-toast";
 
-// Constants
 const STORAGE_KEYS = {
   BARANGAY_INFO: "barangayInfo",
   PRIVACY_SETTINGS: "privacySettings",
@@ -50,21 +49,20 @@ export default function Settings() {
   const [isLoading, setIsLoading] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   
-  // State for all settings
   const [barangayInfo, setBarangayInfo] = useState(DEFAULT_BARANGAY_INFO);
   const [editFormData, setEditFormData] = useState(DEFAULT_BARANGAY_INFO);
   const [privacySettings, setPrivacySettings] = useState(DEFAULT_SETTINGS.privacy);
   const [notificationSettings, setNotificationSettings] = useState(DEFAULT_SETTINGS.notifications);
   const [displaySettings, setDisplaySettings] = useState(DEFAULT_SETTINGS.display);
 
-  // Load settings from localStorage on mount
   useEffect(() => {
     const loadSettings = () => {
       try {
         const savedBarangay = localStorage.getItem(STORAGE_KEYS.BARANGAY_INFO);
         if (savedBarangay) {
-          setBarangayInfo(JSON.parse(savedBarangay));
-          setEditFormData(JSON.parse(savedBarangay));
+          const parsed = JSON.parse(savedBarangay);
+          setBarangayInfo(parsed);
+          setEditFormData(parsed);
         }
 
         const savedPrivacy = localStorage.getItem(STORAGE_KEYS.PRIVACY_SETTINGS);
@@ -100,7 +98,6 @@ export default function Settings() {
     });
   }, []);
 
-  // Apply theme to document
   const applyTheme = (theme) => {
     if (theme === "dark") {
       document.body.classList.add("dark-theme");
@@ -109,7 +106,6 @@ export default function Settings() {
     }
   };
 
-  // Apply font size to document
   const applyFontSize = (fontSize) => {
     const root = document.documentElement;
     const sizes = {
@@ -120,7 +116,6 @@ export default function Settings() {
     root.style.fontSize = sizes[fontSize] || sizes.medium;
   };
 
-  // Navigation handlers
   const handleGoBack = () => {
     logActivity({
       action: "NAVIGATE",
@@ -131,7 +126,6 @@ export default function Settings() {
     navigate(-1);
   };
 
-  // Barangay Information handlers
   const handleEditToggle = () => {
     if (isEditing) {
       setEditFormData(barangayInfo);
@@ -175,7 +169,6 @@ export default function Settings() {
     }
   };
 
-  // Generic setting update handler
   const updateSetting = async (type, key, value, storageKey) => {
     const updateFunctions = {
       privacy: setPrivacySettings,
@@ -196,7 +189,8 @@ export default function Settings() {
       details: `Updated ${type} setting: ${key} to ${value}`
     });
     
-    toast.success(`${key.replace(/([A-Z])/g, ' $1').toLowerCase().trim()} updated`);
+    const label = key.replace(/([A-Z])/g, ' $1').toLowerCase().trim();
+    toast.success(`${label} updated`);
   };
 
   const getCurrentSettings = (type) => {
@@ -208,7 +202,6 @@ export default function Settings() {
     return settings[type];
   };
 
-  // Specific setting handlers
   const handlePrivacyChange = (key, value) => {
     updateSetting("privacy", key, value, STORAGE_KEYS.PRIVACY_SETTINGS);
   };
@@ -228,7 +221,6 @@ export default function Settings() {
     }
   };
 
-  // Reset all settings
   const handleResetAll = async () => {
     const confirmed = window.confirm("Are you sure you want to reset all settings to default values?");
     if (!confirmed) return;
@@ -262,7 +254,6 @@ export default function Settings() {
     }
   };
 
-  // Tab change handler
   const handleTabChange = (tab) => {
     setActiveTab(tab);
     logActivity({
@@ -273,22 +264,21 @@ export default function Settings() {
     });
   };
 
-  // Render components
   const renderInformationTab = () => (
     <div className="tab-pane">
       <div className="tab-header">
         <h2>Barangay Information</h2>
         <div className="tab-actions">
           {!isEditing ? (
-            <button className="edit-btn" onClick={handleEditToggle}>
+            <button className="btn btn-accent" onClick={handleEditToggle}>
               Edit Information
             </button>
           ) : (
-            <div className="edit-actions">
-              <button className="cancel-btn" onClick={handleEditToggle}>
+            <div style={{ display: "flex", gap: "12px" }}>
+              <button className="btn" style={{ background: "#ef4444", color: "white" }} onClick={handleEditToggle}>
                 Cancel
               </button>
-              <button className="save-btn" onClick={handleSaveBarangayInfo} disabled={isLoading}>
+              <button className="btn btn-primary" onClick={handleSaveBarangayInfo} disabled={isLoading}>
                 {isLoading ? "Saving..." : "Save Changes"}
               </button>
             </div>
@@ -319,7 +309,7 @@ export default function Settings() {
                 name="name"
                 value={editFormData.name}
                 onChange={handleInputChange}
-                className="form-input"
+                className="input"
               />
             </div>
             <div className="form-group">
@@ -328,8 +318,9 @@ export default function Settings() {
                 name="address"
                 value={editFormData.address}
                 onChange={handleInputChange}
-                className="form-textarea"
+                className="input"
                 rows="3"
+                style={{ paddingTop: "10px", paddingBottom: "10px", resize: "vertical" }}
               />
             </div>
             <div className="form-group">
@@ -339,7 +330,7 @@ export default function Settings() {
                 name="contact"
                 value={editFormData.contact}
                 onChange={handleInputChange}
-                className="form-input"
+                className="input"
               />
             </div>
             <div className="form-group">
@@ -349,7 +340,7 @@ export default function Settings() {
                 name="email"
                 value={editFormData.email}
                 onChange={handleInputChange}
-                className="form-input"
+                className="input"
               />
             </div>
             <div className="form-group">
@@ -359,7 +350,7 @@ export default function Settings() {
                 name="captain"
                 value={editFormData.captain}
                 onChange={handleInputChange}
-                className="form-input"
+                className="input"
               />
             </div>
             <div className="form-group">
@@ -369,7 +360,7 @@ export default function Settings() {
                 name="skChairperson"
                 value={editFormData.skChairperson}
                 onChange={handleInputChange}
-                className="form-input"
+                className="input"
               />
             </div>
           </div>
@@ -433,7 +424,8 @@ export default function Settings() {
           <select 
             value={privacySettings.dataRetention}
             onChange={(event) => handlePrivacyChange("dataRetention", event.target.value)}
-            className="setting-select"
+            className="input"
+            style={{ width: "auto", minWidth: "150px" }}
           >
             <option value="6 months">6 months</option>
             <option value="12 months">12 months</option>
@@ -590,7 +582,8 @@ export default function Settings() {
           <select 
             value={displaySettings.theme}
             onChange={(event) => handleDisplayChange("theme", event.target.value)}
-            className="setting-select"
+            className="input"
+            style={{ width: "auto", minWidth: "150px" }}
           >
             <option value="light">Light</option>
             <option value="dark">Dark</option>
@@ -605,7 +598,8 @@ export default function Settings() {
           <select 
             value={displaySettings.fontSize}
             onChange={(event) => handleDisplayChange("fontSize", event.target.value)}
-            className="setting-select"
+            className="input"
+            style={{ width: "auto", minWidth: "150px" }}
           >
             <option value="small">Small</option>
             <option value="medium">Medium</option>
@@ -645,6 +639,20 @@ export default function Settings() {
       </div>
     </div>
   );
+
+  if (isLoading && !barangayInfo) {
+    return (
+      <>
+        <Navbar />
+        <div className="settings-page">
+          <div className="loading-state">
+            <div className="spinner"></div>
+            <p>Loading settings...</p>
+          </div>
+        </div>
+      </>
+    );
+  }
 
   return (
     <>
@@ -699,7 +707,7 @@ export default function Settings() {
             {activeTab === "Display" && renderDisplayTab()}
             
             <div className="reset-section">
-              <button className="reset-btn" onClick={handleResetAll}>
+              <button className="btn" style={{ background: "#6c757d", color: "white", width: "100%" }} onClick={handleResetAll}>
                 Reset All Settings
               </button>
             </div>

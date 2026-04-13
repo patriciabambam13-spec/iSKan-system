@@ -5,44 +5,49 @@ export const logActivity = async ({
   table,
   recordId = null,
   details = "",
- 
+  oldData = null,
+  newData = null
 }) => {
   try {
     const { data: userData } = await supabase.auth.getUser();
 
-    // Match EXACTLY with your audit_logs table schema
+    // Get user role from localStorage or fetch from database
+    const userRole = localStorage.getItem("userRole");
+    
+    // Get user name if available
+    const userName = localStorage.getItem("userName");
+
     const logEntry = {
       user_id: userData?.user?.id || null,
-      user_role: "admin", // You can modify this based on user's actual role
-      action: action.toUpperCase(), // Standardize to UPPERCASE (CREATE, UPDATE, DELETE)
+      user_email: userData?.user?.email || null,
+      user_name: userName,
+      user_role: userRole ? (userRole === "1" ? "chairman" : "kagawad") : "unknown",
+      action: action.toUpperCase(),
       table_name: table,
       record_id: recordId,
       details: details,
-      ip_address: "local", // Replace with actual IP detection if needed
-      created_at: new Date().toISOString()
+      old_data: oldData,
+      new_data: newData,
+      ip_address: "local"
     };
 
-    // DEBUGGING: Log what we're trying to insert
     console.log("📝 LOGGING ATTEMPT:", logEntry);
 
     const { data, error } = await supabase
       .from("audit_logs")
       .insert([logEntry])
-      .select(); // Returns the inserted record
+      .select();
 
     if (error) {
-      // DEBUGGING: Log the exact error
       console.error("❌ INSERT ERROR:", error.message);
       console.error("Error details:", error);
       throw error;
     }
 
-    // DEBUGGING: Confirm successful insert
     console.log("✅ LOG INSERTED SUCCESSFULLY:", data);
     return { success: true, data };
 
   } catch (err) {
-    // DEBUGGING: Log any caught errors
     console.error("🔥 LOG ACTIVITY ERROR:", err.message);
     return { success: false, error: err.message };
   }

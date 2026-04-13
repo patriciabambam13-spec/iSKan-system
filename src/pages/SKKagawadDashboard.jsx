@@ -7,11 +7,11 @@ import {
   FaTachometerAlt, FaUsers, FaPlusCircle, FaQrcode, 
   FaList, FaExchangeAlt, FaChartLine, FaExclamationTriangle,
   FaChevronLeft, FaChevronRight, FaCalendarAlt, FaClock,
-  FaCheckCircle, FaTimesCircle, FaHourglassHalf
+  FaCheckCircle, FaTimesCircle, FaHourglassHalf, FaFileAlt,
+  FaUserCheck, FaCalendarCheck, FaHandHoldingHeart
 } from "react-icons/fa";
-import "../styles/dashboard.css";
+import "../styles/SKkagawad.css";
 
-// Use the SAME images that Chairman dashboard uses
 import icon_youth from "../assets/totalyouth_ca.png";
 import icon_programs from "../assets/activeprograms_ca.png";
 import icon_transactions from "../assets/transactions_ca.png";
@@ -21,7 +21,7 @@ import icon_benefeciaries from "../assets/beneficiaries_ca.png";
 export default function SKKagawadDashboard() {
   const navigate = useNavigate();
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [ setIsAuthorized] = useState(false);
+  const [isAuthorized, setIsAuthorized] = useState(false);
   const [stats, setStats] = useState({
     youth: 0,
     upcomingPrograms: 0,
@@ -34,14 +34,14 @@ export default function SKKagawadDashboard() {
   const [recentScans, setRecentScans] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
- // ========== ROLE PROTECTION ==========
+  // Role protection
   useEffect(() => {
     const checkAccess = async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser();
         
         if (!user) {
-          navigate("/login");
+          navigate("/");
           return;
         }
 
@@ -53,56 +53,49 @@ export default function SKKagawadDashboard() {
 
         if (error || !userData) {
           console.error("Error fetching user role:", error);
-          navigate("/login");
+          navigate("/");
           return;
         }
 
-        // Check if role is Kagawad (role_id = 2)
         if (userData.role_id !== 2) {
-          navigate("/unauthorized");
+          navigate("/");
           return;
         }
 
         setIsAuthorized(true);
       } catch (error) {
         console.error("Auth check error:", error);
-        navigate("/login");
+        navigate("/");
       }
     };
 
     checkAccess();
   }, [navigate]);
 
-  // ========== FETCH FUNCTIONS ==========
-  
+  // Fetch stats
   const fetchStats = async () => {
     try {
-      // Total youth
       const { count: youthCount } = await supabase
         .from("youth")
         .select("*", { count: "exact", head: true });
 
-      // Upcoming programs (start_date >= today)
       const today = new Date().toISOString().split('T')[0];
       const { count: upcomingCount } = await supabase
         .from("programs")
         .select("*", { count: "exact", head: true })
         .gte("start_date", today);
 
-      // Pending transactions
       const { count: pendingCount } = await supabase
         .from("transactions")
         .select("*", { count: "exact", head: true })
         .eq("status", "pending");
 
-      // Overdue equipment
       const { count: overdueCount } = await supabase
         .from("equipment")
         .select("*", { count: "exact", head: true })
         .lt("due_date", today)
         .eq("status", "borrowed");
 
-      // Beneficiaries this month
       const startOfMonth = new Date();
       startOfMonth.setDate(1);
       const { data: beneficiaries } = await supabase
@@ -144,7 +137,6 @@ export default function SKKagawadDashboard() {
 
       if (error) throw error;
 
-      // Transform data for display
       const formatted = [];
       data?.forEach(program => {
         program.transactions?.forEach(tx => {
@@ -198,7 +190,7 @@ export default function SKKagawadDashboard() {
     }
   };
 
-  // ========== LOAD DATA ==========
+  // Load dashboard data
   useEffect(() => {
     const loadDashboard = async () => {
       setIsLoading(true);
@@ -213,21 +205,21 @@ export default function SKKagawadDashboard() {
     loadDashboard();
   }, []);
 
-  // ========== HELPER FUNCTIONS ==========
+  // Status badge helper
   const getStatusBadge = (status) => {
     switch(status?.toLowerCase()) {
       case 'approved':
-        return <span className="badge approved"><FaCheckCircle /> Approved</span>;
+        return <span className="status-badge approved"><FaCheckCircle /> Approved</span>;
       case 'pending':
-        return <span className="badge pending"><FaHourglassHalf /> Pending</span>;
+        return <span className="status-badge pending"><FaHourglassHalf /> Pending</span>;
       case 'ineligible':
-        return <span className="badge ineligible"><FaTimesCircle /> Ineligible</span>;
+        return <span className="status-badge ineligible"><FaTimesCircle /> Ineligible</span>;
       default:
-        return <span className="badge default">{status}</span>;
+        return <span className="status-badge default">{status}</span>;
     }
   };
 
-  // ========== MENU ITEMS (Kagawad specific) ==========
+  // Menu items for Kagawad
   const menuItems = [
     { name: "Dashboard", icon: FaTachometerAlt, path: "/kagawad-dashboard" },
     { name: "Scan QR", icon: FaQrcode, path: "/scan" },
@@ -237,11 +229,29 @@ export default function SKKagawadDashboard() {
     { name: "Generate Report", icon: FaChartLine, path: "/generate-reports" },
   ];
 
-  // ========== RENDER ==========
+  // Quick actions with icons
+  const quickActions = [
+    { name: "Scan QR", icon: FaQrcode, path: "/scan", color: "#10B981" },
+    { name: "Create Program", icon: FaPlusCircle, path: "/create-programs", color: "#F59E0B" },
+    { name: "View Programs", icon: FaList, path: "/view-programs", color: "#8B5CF6" },
+    { name: "Transactions", icon: FaExchangeAlt, path: "/transactions", color: "#EF4444" },
+    { name: "Generate Report", icon: FaChartLine, path: "/generate-reports", color: "#EC4899" },
+  ];
+
+  // Loading guard
+  if (!isAuthorized) {
+    return (
+      <div className="loading-container">
+        <div className="spinner"></div>
+        <p>Checking access...</p>
+      </div>
+    );
+  }
+
   return (
     <>
       <Navbar />
-      <div className="dashboard-layout">
+      <div className="kagawad-dashboard-layout">
         {/* Sidebar */}
         <div className={`sidebar ${!isSidebarOpen ? "collapsed" : ""}`}>
           <button 
@@ -306,30 +316,20 @@ export default function SKKagawadDashboard() {
           <div className="quick-actions-section">
             <h3>Quick Actions</h3>
             <div className="actions-grid">
-              <button onClick={() => navigate('/scan')} className="action-btn">
-                <FaQrcode className="action-icon-svg" />
-                <span>Scan QR</span>
-              </button>
-              
-              <button onClick={() => navigate('/create-programs')} className="action-btn">
-                <FaPlusCircle className="action-icon-svg" />
-                <span>Create Program</span>
-              </button>
-              
-              <button onClick={() => navigate('/view-programs')} className="action-btn">
-                <FaList className="action-icon-svg" />
-                <span>View Programs</span>
-              </button>
-              
-              <button onClick={() => navigate('/transactions')} className="action-btn">
-                <FaExchangeAlt className="action-icon-svg" />
-                <span>Transactions</span>
-              </button>
-              
-              <button onClick={() => navigate('/generate-reports')} className="action-btn">
-                <FaChartLine className="action-icon-svg" />
-                <span>Generate Report</span>
-              </button>
+              {quickActions.map((action, index) => {
+                const IconComponent = action.icon;
+                return (
+                  <button 
+                    key={index} 
+                    onClick={() => navigate(action.path)} 
+                    className="action-btn"
+                    style={{ borderTopColor: action.color }}
+                  >
+                    <IconComponent className="action-icon-svg" style={{ color: action.color }} />
+                    <span>{action.name}</span>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -343,7 +343,7 @@ export default function SKKagawadDashboard() {
             <div className="bottom-section">
               {/* Ongoing Programs Card */}
               <div className="info-card">
-                <h3>Ongoing Programs</h3>
+                <h3><FaCalendarCheck className="card-icon" /> Ongoing Programs</h3>
                 <div className="info-list">
                   {ongoingPrograms.length > 0 ? (
                     ongoingPrograms.map((program, index) => (
@@ -362,14 +362,14 @@ export default function SKKagawadDashboard() {
                       </div>
                     ))
                   ) : (
-                    <p className="no-data">No ongoing programs</p>
+                    <p className="empty-state">No ongoing programs</p>
                   )}
                 </div>
               </div>
 
               {/* Recent QR Scans Card */}
               <div className="info-card">
-                <h3>Recent QR Scans</h3>
+                <h3><FaQrcode className="card-icon" /> Recent QR Scans</h3>
                 <div className="info-list">
                   {recentScans.length > 0 ? (
                     recentScans.map((scan, index) => (
@@ -390,7 +390,7 @@ export default function SKKagawadDashboard() {
                       </div>
                     ))
                   ) : (
-                    <p className="no-data">No recent QR scans</p>
+                    <p className="empty-state">No recent QR scans</p>
                   )}
                 </div>
               </div>

@@ -3,14 +3,16 @@ import { useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import { supabase } from "../services/supabaseClient";
 import { Html5Qrcode } from "html5-qrcode";
-import { FaQrcode, FaCheckCircle, FaTimesCircle, FaUser, FaClipboardList, FaPrint, FaTools, FaHistory } from "react-icons/fa";
+import jsQR from "jsqr";
+import { FaQrcode, FaCheckCircle, FaTimesCircle, FaUser, FaClipboardList, FaPrint, FaTools, FaHistory, FaUpload, FaCamera, FaArrowLeft } from "react-icons/fa";
 import { format } from "date-fns";
 import "../styles/scanQR.css";
 
 export default function ScanQRPage() {
   const navigate = useNavigate();
   const [isAuthorized, setIsAuthorized] = useState(false);
-  const [scanning, setScanning] = useState(true);
+  const [mode, setMode] = useState(null); // "scan" or "upload"
+  const [scanning, setScanning] = useState(false);
   const [userInfo, setUserInfo] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedAction, setSelectedAction] = useState(null);
@@ -20,6 +22,7 @@ export default function ScanQRPage() {
   const [errorMessage, setErrorMessage] = useState("");
   const [recentScans, setRecentScans] = useState([]);
   const [hasScanned, setHasScanned] = useState(false);
+  const [uploading, setUploading] = useState(false);
   
   const html5QrCodeRef = useRef(null);
   const isProcessingRef = useRef(false);
@@ -31,7 +34,7 @@ export default function ScanQRPage() {
         const { data: { user } } = await supabase.auth.getUser();
         
         if (!user) {
-          navigate("/login");
+          navigate("/");
           return;
         }
 
@@ -42,20 +45,19 @@ export default function ScanQRPage() {
           .single();
 
         if (error || !userData) {
-          navigate("/login");
+          navigate("/");
           return;
         }
 
-        // Allow both Chairman (1) and Kagawad (2) to scan
         if (userData.role_id !== 1 && userData.role_id !== 2) {
-          navigate("/unauthorized");
+          navigate("/");
           return;
         }
 
         setIsAuthorized(true);
       } catch (error) {
         console.error("Auth check error:", error);
-        navigate("/login");
+        navigate("/");
       }
     };
 
@@ -66,12 +68,13 @@ export default function ScanQRPage() {
   const fetchRecentScans = async () => {
     try {
       const { data, error } = await supabase
-        .from("attendance_logs")
+        .from("attendance")
         .select(`
           id,
-          activity_type,
+          method,
           created_at,
-          youth:youth_id(first_name, last_name)
+          youth:youth_id(first_name, last_name),
+          program:program_id(program_name)
         `)
         .order("created_at", { ascending: false })
         .limit(10);
@@ -81,9 +84,9 @@ export default function ScanQRPage() {
       const formatted = data?.map(log => ({
         id: log.id,
         youthName: `${log.youth?.first_name || ''} ${log.youth?.last_name || ''}`.trim(),
-        activityType: log.activity_type === "attendance" ? "Seminar Attendance" :
-                      log.activity_type === "borrow" ? "Equipment Borrowing" :
-                      "Printing Transaction",
+        activityType: "Attendance",
+        programName: log.program?.program_name || "Unknown Program",
+        method: log.method,
         time: format(new Date(log.created_at), "hh:mm a"),
         date: format(new Date(log.created_at), "MMM dd, yyyy")
       })) || [];
@@ -95,15 +98,14 @@ export default function ScanQRPage() {
   };
 
   // ========== CHECK DUPLICATE ATTENDANCE ==========
-  const checkDuplicate = async (userId, activityType) => {
+  const checkDuplicate = async (userId) => {
     try {
       const today = new Date().toISOString().split('T')[0];
       
       const { data, error } = await supabase
-        .from("attendance_logs")
+        .from("attendance")
         .select("id")
         .eq("youth_id", userId)
-        .eq("activity_type", activityType)
         .gte("created_at", today)
         .maybeSingle();
 
@@ -117,10 +119,14 @@ export default function ScanQRPage() {
   };
 
   // ========== CALCULATE ACCURATE AGE ==========
-  const calculateAge = (birthDate) => {
+  const calculateAge = (birthdate) => {
+    if (!birthdate) return null;
     const today = new Date();
-    const diff = today - new Date(birthDate);
-    return Math.floor(diff / (1000 * 60 * 60 * 24 * 365.25));
+    const birth = new Date(birthdate);
+    let age = today.getFullYear() - birth.getFullYear();
+    const m = today.getMonth() - birth.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
+    return age;
   };
 
   // ========== PROCESS QR CODE ==========
@@ -142,22 +148,18 @@ export default function ScanQRPage() {
         return;
       }
       
-      let youthId = qrData;
+      console.log("SCANNED QR:", qrData);
+      
+      // Extract QR code value - handle JSON or plain text
+      let qrCodeValue = qrData;
       try {
         const parsed = JSON.parse(qrData);
-        youthId = parsed.youth_id || parsed.id || qrData;
+        qrCodeValue = parsed.qr_code || parsed.youth_id || parsed.id || qrData;
       } catch {
-        // If not JSON, use as is
+        // Not JSON, use as is
       }
 
-      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-      if (!uuidRegex.test(youthId)) {
-        setErrorMessage("Invalid QR code format. Please use a valid youth QR code.");
-        setHasScanned(false);
-        isProcessingRef.current = false;
-        setIsLoading(false);
-        return;
-      }
+      console.log("QR CODE VALUE:", qrCodeValue);
 
       const { data: youth, error } = await supabase
         .from("youth")
@@ -165,15 +167,16 @@ export default function ScanQRPage() {
           id,
           first_name,
           last_name,
-          age,
+          birthdate,
           barangay,
           status,
-          birth_date
+          qr_code
         `)
-        .eq("id", youthId)
+        .eq("qr_code", qrCodeValue)
         .single();
 
       if (error || !youth) {
+        console.error("Youth not found:", error);
         setErrorMessage("User not found. Invalid QR code.");
         setHasScanned(false);
         isProcessingRef.current = false;
@@ -181,19 +184,18 @@ export default function ScanQRPage() {
         return;
       }
 
-      let age = youth.age;
-      if (!age && youth.birth_date) {
-        age = calculateAge(youth.birth_date);
-      }
+      const age = calculateAge(youth.birthdate);
 
       setUserInfo({
         id: youth.id,
         name: `${youth.first_name} ${youth.last_name}`,
         age: age || "N/A",
         barangay: youth.barangay || "Barangay Pinagkaisahan",
-        status: youth.status || "Active"
+        status: youth.status || "Active",
+        qr_code: youth.qr_code
       });
 
+      // Stop scanner if it's running
       if (html5QrCodeRef.current) {
         try {
           await html5QrCodeRef.current.stop();
@@ -215,9 +217,55 @@ export default function ScanQRPage() {
     }
   };
 
-  // ========== INITIALIZE SCANNER ==========
+  // ========== HANDLE QR IMAGE UPLOAD ==========
+  const handleFileUpload = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    setUploading(true);
+    setErrorMessage("");
+
+    const img = new Image();
+    const reader = new FileReader();
+
+    reader.onload = () => {
+      img.src = reader.result;
+    };
+
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d");
+
+      canvas.width = img.width;
+      canvas.height = img.height;
+      ctx.drawImage(img, 0, 0);
+
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const code = jsQR(imageData.data, canvas.width, canvas.height);
+
+      if (code) {
+        console.log("✅ UPLOADED QR:", code.data);
+        processQRCode(code.data);
+      } else {
+        setErrorMessage("No QR code found in image. Please try a different image.");
+      }
+      
+      setUploading(false);
+      event.target.value = "";
+    };
+
+    img.onerror = () => {
+      setErrorMessage("Failed to load image. Please try again.");
+      setUploading(false);
+      event.target.value = "";
+    };
+
+    reader.readAsDataURL(file);
+  };
+
+  // ========== INITIALIZE SCANNER - Only when mode is "scan" ==========
   useEffect(() => {
-    if (!isAuthorized || !scanning || html5QrCodeRef.current) return;
+    if (!isAuthorized || mode !== "scan" || scanning || html5QrCodeRef.current) return;
 
     const startScanner = async () => {
       try {
@@ -229,38 +277,23 @@ export default function ScanQRPage() {
           aspectRatio: 1.0,
         };
 
-        try {
-          await html5QrCodeRef.current.start(
-            { facingMode: "environment" },
-            config,
-            (decodedText) => {
-              processQRCode(decodedText);
-            },
-            () => {  // ✅ FIX: Unused parameter renamed to _
-              // Silent error handling
-            }
-          );
-        } catch (cameraError) {
-          console.log("Back camera failed, trying default camera:", cameraError);
-          const devices = await Html5Qrcode.getCameras();
-          if (devices && devices.length > 0) {
-            await html5QrCodeRef.current.start(
-              devices[0].id,
-              config,
-              (decodedText) => {
-                processQRCode(decodedText);
-              },
-              () => {  // ✅ FIX: Unused parameter renamed to _
-                // Silent error handling
-              }
-            );
-          } else {
-            throw new Error("No cameras found");
+        await html5QrCodeRef.current.start(
+          { facingMode: "user" },
+          config,
+          (decodedText) => {
+            console.log("✅ SCANNED:", decodedText);
+            processQRCode(decodedText);
+          },
+          (error) => {
+            console.log("Scan error:", error);
           }
-        }
+        );
+        setScanning(true);
+        console.log("Scanner started successfully");
       } catch (error) {
         console.error("Error starting scanner:", error);
-        setErrorMessage("Failed to start camera. Please check permissions and ensure you have a camera connected.");
+        setErrorMessage("Failed to start camera. Please check permissions or use the upload option.");
+        setMode(null);
       }
     };
 
@@ -279,12 +312,14 @@ export default function ScanQRPage() {
         }
       };
       stopScanner();
+      setScanning(false);
     };
-  }, [isAuthorized, scanning]);
+  }, [isAuthorized, mode, scanning]);
 
   // ========== RESET SCANNER ==========
-  const resetScanner = async () => {
-    try {
+  const resetToModeSelection = () => {
+    // Stop scanner if running
+    const stopScanner = async () => {
       if (html5QrCodeRef.current) {
         try {
           await html5QrCodeRef.current.stop();
@@ -294,9 +329,8 @@ export default function ScanQRPage() {
         }
         html5QrCodeRef.current = null;
       }
-    } catch (error) {
-      console.log("Error resetting scanner:", error);
-    }
+    };
+    stopScanner();
 
     setUserInfo(null);
     setSelectedAction(null);
@@ -304,7 +338,8 @@ export default function ScanQRPage() {
     setErrorMessage("");
     setHasScanned(false);
     isProcessingRef.current = false;
-    setScanning(true);
+    setScanning(false);
+    setMode(null);
   };
 
   // ========== HANDLE ACTION SELECTION ==========
@@ -321,9 +356,9 @@ export default function ScanQRPage() {
     setErrorMessage("");
 
     try {
-      const isDuplicate = await checkDuplicate(userInfo.id, selectedAction);
+      const isDuplicate = await checkDuplicate(userInfo.id);
       if (isDuplicate) {
-        setErrorMessage(`${userInfo.name} has already completed this ${selectedAction === "attendance" ? "seminar attendance" : selectedAction === "borrow" ? "equipment borrowing" : "printing transaction"} today.`);
+        setErrorMessage(`${userInfo.name} has already recorded attendance today.`);
         setIsLoading(false);
         return;
       }
@@ -336,15 +371,15 @@ export default function ScanQRPage() {
         .eq("user_id", user.id)
         .single();
 
-      const handledBy = userData ? `${userData.first_name} ${userData.last_name}` : "System";
+      const verifiedBy = userData ? `${userData.first_name} ${userData.last_name}` : "System";
 
       const { error: insertError } = await supabase
-        .from("attendance_logs")
+        .from("attendance")
         .insert({
           youth_id: userInfo.id,
-          activity_type: selectedAction,
-          handled_by: handledBy,
-          status: "completed"
+          method: "qr",
+          verified_by: verifiedBy,
+          notes: `QR scan - ${selectedAction} transaction`
         });
 
       if (insertError) throw insertError;
@@ -371,7 +406,7 @@ export default function ScanQRPage() {
       
       setTimeout(() => {
         setShowSuccess(false);
-        resetScanner();
+        resetToModeSelection();
       }, 3000);
       
     } catch (error) {
@@ -411,13 +446,15 @@ export default function ScanQRPage() {
       <Navbar />
       <div className="scan-qr-page">
         <div className="scan-container">
-          {/* Header */}
-          <div className="scan-header">
-            <h1>
-              <FaQrcode className="header-icon" />
-              QR Code Scanner
-            </h1>
-            <p>Scan youth QR code to record attendance, borrowing, or printing transactions</p>
+          {/* Header with Back Button - Matching other pages */}
+          <div className="page-header">
+            <button className="back-btn" onClick={() => navigate(-1)}>
+              <FaArrowLeft /> Back
+            </button>
+            <div className="header-text">
+              <h2>QR Code Scanner</h2>
+              <p>Scan or upload QR code to record transactions</p>
+            </div>
           </div>
 
           {/* Success Toast */}
@@ -441,9 +478,29 @@ export default function ScanQRPage() {
           )}
 
           <div className="scan-content">
-            {/* Left Column - Scanner */}
+            {/* Left Column - Scanner/Upload Area */}
             <div className="scanner-column">
-              {scanning ? (
+              {/* Mode Selection - Shown first */}
+              {!mode && (
+                <div className="mode-selection">
+                  <h3>Choose Method</h3>
+                  <div className="mode-buttons">
+                    <button onClick={() => setMode("scan")} className="mode-btn scan-mode">
+                      <FaCamera />
+                      <span>Scan QR Code</span>
+                      <small>Use camera to scan live QR</small>
+                    </button>
+                    <button onClick={() => setMode("upload")} className="mode-btn upload-mode">
+                      <FaUpload />
+                      <span>Upload QR Image</span>
+                      <small>Upload a screenshot or photo of QR</small>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Scan Mode */}
+              {mode === "scan" && (
                 <>
                   <div className="scanner-wrapper">
                     <div id="qr-reader" className="qr-reader"></div>
@@ -452,35 +509,73 @@ export default function ScanQRPage() {
                       <p>Position QR code within the frame</p>
                     </div>
                   </div>
+                  <button onClick={resetToModeSelection} className="change-mode-btn">
+                    ← Change Mode
+                  </button>
                 </>
-              ) : (
-                <div className="user-info-card">
-                  <h3>Youth Information</h3>
-                  {userInfo && (
-                    <div className="user-details">
-                      <div className="user-avatar">
-                        <FaUser />
-                      </div>
-                      <div className="user-field">
-                        <strong>Name:</strong>
-                        <span>{userInfo.name}</span>
-                      </div>
-                      <div className="user-field">
-                        <strong>Age:</strong>
-                        <span>{userInfo.age}</span>
-                      </div>
-                      <div className="user-field">
-                        <strong>Barangay:</strong>
-                        <span>{userInfo.barangay}</span>
-                      </div>
-                      <div className="user-field">
-                        <strong>Status:</strong>
-                        <span className={`status-badge ${userInfo.status === "Active" ? "active" : "inactive"}`}>
-                          {userInfo.status}
-                        </span>
-                      </div>
+              )}
+
+              {/* Upload Mode */}
+              {mode === "upload" && !userInfo && (
+                <div className="upload-section">
+                  <div className="upload-icon">
+                    <FaQrcode />
+                  </div>
+                  <h3>Upload QR Code Image</h3>
+                  <p>Select an image file containing a QR code</p>
+                  <label className="upload-btn">
+                    <FaUpload /> Choose Image
+                    <input 
+                      type="file" 
+                      accept="image/*" 
+                      onChange={handleFileUpload} 
+                      hidden 
+                      disabled={uploading}
+                    />
+                  </label>
+                  {uploading && (
+                    <div className="uploading-status">
+                      <div className="spinner-small"></div>
+                      <p>Processing image...</p>
                     </div>
                   )}
+                  <button onClick={resetToModeSelection} className="change-mode-btn">
+                    ← Change Mode
+                  </button>
+                </div>
+              )}
+
+              {/* User Info after successful scan/upload */}
+              {userInfo && (
+                <div className="user-info-card">
+                  <h3>Youth Information</h3>
+                  <div className="user-details">
+                    <div className="user-avatar">
+                      <FaUser />
+                    </div>
+                    <div className="user-field">
+                      <strong>Name:</strong>
+                      <span>{userInfo.name}</span>
+                    </div>
+                    <div className="user-field">
+                      <strong>Age:</strong>
+                      <span>{userInfo.age}</span>
+                    </div>
+                    <div className="user-field">
+                      <strong>Barangay:</strong>
+                      <span>{userInfo.barangay}</span>
+                    </div>
+                    <div className="user-field">
+                      <strong>QR Code:</strong>
+                      <span>{userInfo.qr_code}</span>
+                    </div>
+                    <div className="user-field">
+                      <strong>Status:</strong>
+                      <span className={`status-badge ${userInfo.status === "Active" ? "active" : "inactive"}`}>
+                        {userInfo.status}
+                      </span>
+                    </div>
+                  </div>
 
                   <div className="action-buttons">
                     <h4>Select Transaction Type:</h4>
@@ -509,7 +604,7 @@ export default function ScanQRPage() {
                     </div>
                   </div>
 
-                  <button onClick={resetScanner} className="rescan-btn">
+                  <button onClick={resetToModeSelection} className="rescan-btn">
                     <FaQrcode />
                     Scan Another QR
                   </button>
@@ -531,6 +626,7 @@ export default function ScanQRPage() {
                         <div className="scan-info">
                           <span className="scan-name">{scan.youthName}</span>
                           <span className="scan-type">{scan.activityType}</span>
+                          <span className="scan-program">{scan.programName}</span>
                           <span className="scan-time">{scan.time}</span>
                         </div>
                         <span className="scan-date">{scan.date}</span>

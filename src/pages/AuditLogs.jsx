@@ -41,17 +41,13 @@ export default function AuditLogs() {
     try {
       const { data, error } = await supabase
         .from("audit_logs")
-        .select(`
-          *,
-          users:user_id(email)
-        `)
+        .select("*")
         .order("created_at", { ascending: false });
 
       if (error) throw error;
 
       const logsData = data || [];
-      setLogs(logsData);
-      setFilteredLogs(logsData);
+      setLogs(logsData); // ONLY set logs, NOT filteredLogs
 
       // calculate stats
       const today = format(new Date(), "yyyy-MM-dd");
@@ -61,7 +57,7 @@ export default function AuditLogs() {
       weekAgo.setDate(weekAgo.getDate() - 7);
       const weekLogs = logsData.filter(l => new Date(l.created_at) >= weekAgo);
       
-      const uniqueUsers = new Set(logsData.map(l => l.user_id)).size;
+      const uniqueUsers = new Set(logsData.map(l => l.user_id).filter(Boolean)).size;
 
       setStats({
         total: logsData.length,
@@ -86,8 +82,7 @@ export default function AuditLogs() {
       .on('postgres_changes', 
         { event: 'INSERT', schema: 'public', table: 'audit_logs' },
         (payload) => {
-          setLogs(prev => [payload.new, ...prev]);
-          setFilteredLogs(prev => [payload.new, ...prev]);
+          setLogs(prev => [payload.new, ...prev]); // ONLY update logs
         }
       )
       .subscribe();
@@ -97,31 +92,38 @@ export default function AuditLogs() {
     };
   }, []);
 
-  // filter logic
+  // filter logic - SINGLE SOURCE OF TRUTH
   useEffect(() => {
     let filtered = [...logs];
 
-    if (searchTerm) {
+    if (searchTerm.trim() !== "") {
+      const term = searchTerm.toLowerCase();
+
       filtered = filtered.filter(log =>
-        (log.action || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (log.table_name || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (log.record_id || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (log.details || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-        // FIXED: Use users.email instead of non-existent user_email
-        (log.users?.email || "").toLowerCase().includes(searchTerm.toLowerCase())
+        String(log.action || "").toLowerCase().includes(term) ||
+        String(log.table_name || "").toLowerCase().includes(term) ||
+        String(log.record_id || "").toLowerCase().includes(term) ||
+        String(log.details || "").toLowerCase().includes(term) ||
+        String(log.user_id || "").toLowerCase().includes(term) ||
+        String(log.user_name || "").toLowerCase().includes(term) ||
+        String(log.user_email || "").toLowerCase().includes(term)
       );
     }
 
-    if (actionType) {
+    if (actionType && actionType !== "") {
       filtered = filtered.filter(log => log.action === actionType);
     }
 
     if (fromDate) {
-      filtered = filtered.filter(log => log.created_at?.slice(0, 10) >= fromDate);
+      filtered = filtered.filter(log =>
+        log.created_at && log.created_at.slice(0, 10) >= fromDate
+      );
     }
 
     if (toDate) {
-      filtered = filtered.filter(log => log.created_at?.slice(0, 10) <= toDate);
+      filtered = filtered.filter(log =>
+        log.created_at && log.created_at.slice(0, 10) <= toDate
+      );
     }
 
     setFilteredLogs(filtered);
@@ -155,16 +157,21 @@ export default function AuditLogs() {
       return;
     }
 
-    const headers = ["Timestamp", "User", "Action", "Table", "Record ID", "Details"];
+    const headers = ["Timestamp", "User ID", "User Email", "User Name", "User Role", "Action", "Table", "Record ID", "Details", "Old Data", "New Data", "IP Address"];
 
     const rows = filteredLogs.map(log => [
       log.created_at ? format(new Date(log.created_at), "yyyy-MM-dd HH:mm:ss") : "",
-      // FIXED: Use users.email instead of user_email
-      log.users?.email || "Unknown",
+      log.user_id || "Unknown",
+      log.user_email || "",
+      log.user_name || "",
+      log.user_role || "",
       log.action || "",
       log.table_name || "",
       log.record_id || "",
-      log.details || ""
+      log.details || "",
+      log.old_data ? JSON.stringify(log.old_data) : "",
+      log.new_data ? JSON.stringify(log.new_data) : "",
+      log.ip_address || ""
     ]);
 
     let csv = headers.join(",") + "\n";
@@ -194,7 +201,7 @@ export default function AuditLogs() {
       <Navbar />
 
       <div className="audit-container">
-        {/* FIXED: Header with white rectangular background and inline layout */}
+        {/* Header */}
         <div className="audit-page-header clean-header">
           <button className="back-btn" onClick={() => navigate(-1)}>
             ←
@@ -271,6 +278,10 @@ export default function AuditLogs() {
                 <option value="CREATE">CREATE</option>
                 <option value="UPDATE">UPDATE</option>
                 <option value="DELETE">DELETE</option>
+                <option value="VIEW">VIEW</option>
+                <option value="EXPORT">EXPORT</option>
+                <option value="LOGIN">LOGIN</option>
+                <option value="LOGOUT">LOGOUT</option>
               </select>
             </div>
 
@@ -336,8 +347,9 @@ export default function AuditLogs() {
                           ? format(new Date(log.created_at), "MMM dd, yyyy HH:mm:ss")
                           : "-"}
                       </td>
-                      {/* FIXED: Use users.email instead of user_email */}
-                      <td>{log.users?.email || "Unknown"}</td>
+                      <td>
+                        {log.user_name || log.user_email || log.user_id || "Unknown"}
+                      </td>
                       <td>{getActionBadge(log.action)}</td>
                       <td>{log.table_name || "-"}</td>
                       <td><code>{log.record_id || "-"}</code></td>

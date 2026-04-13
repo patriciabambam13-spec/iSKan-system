@@ -1,130 +1,159 @@
 import { FaBell, FaCog, FaSignOutAlt, FaSearch } from "react-icons/fa";
-import React, { useState } from 'react';
+import React, { useState, useEffect } from "react";
+import { supabase } from "../services/supabaseClient";
 import skLogo from "../assets/sk-logo.png";
 import "../styles/navbar.css";
 
 export default function Navbar() {
-  const user = JSON.parse(localStorage.getItem("user")) || {
-    name: "User",
-    role: "chairman"
+  const role = Number(localStorage.getItem("userRole"));
+  const name = localStorage.getItem("userName") || "User";
+  const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+
+  // Get user initials for avatar
+  const getUserInitials = () => {
+    const nameParts = name.trim().split(" ");
+    if (nameParts.length >= 2) {
+      return (nameParts[0][0] + nameParts[1][0]).toUpperCase();
+    }
+    return nameParts[0][0].toUpperCase();
   };
 
-  function logout(){
-    localStorage.removeItem("user");
+  // Fetch notifications and setup real-time listener
+  useEffect(() => {
+    const fetchNotifications = async () => {
+      const { data } = await supabase
+        .from("notifications")
+        .select("*")
+        .eq("role_target", role)
+        .order("created_at", { ascending: false });
+
+      setNotifications(data || []);
+    };
+
+    fetchNotifications();
+
+    // Real-time subscription for new notifications
+    const channel = supabase
+      .channel("notifications-channel")
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "notifications",
+        },
+        (payload) => {
+          if (payload.new.role_target === role) {
+            setNotifications((prev) => [payload.new, ...prev]);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [role]);
+
+  function logout() {
+    localStorage.removeItem("userRole");
+    localStorage.removeItem("userName");
+    localStorage.removeItem("userId");
     window.location.href = "/";
   }
 
-  function Settings(){
+  function Settings() {
     window.location.href = "/settings";
   }
 
-  // State to track if the drawer is visible
-  const [isNotificationOpen, setIsNotificationOpen] = useState(false);
-
-  // Function to toggle the state
   const toggleNotifications = () => {
     setIsNotificationOpen(!isNotificationOpen);
   };
 
-  // If there's no user, don't render the navbar.
-  // This is useful to prevent showing the navbar on login/signup pages.
-  if (!user) {
+  const unreadCount = notifications.length;
+
+  if (!role) {
     return null;
   }
 
   return (
     <>
       <div className="navbar">
-
         {/* LEFT SIDE */}
-        <div className="nav-left">
-          <img src={skLogo} className="nav-logo" alt="SK Logo" />
-
-          <div className="nav-title">
-            <span className="system-name">iSKan</span>
-            <span className="system-role">
-              {user.role === "chairman"
-                ? "SK Chairman Dashboard"
-                : "SK Kagawad Dashboard"}
+        <div className="navbar-left">
+          <img src={skLogo} className="navbar-logo" alt="SK Logo" />
+          <div className="navbar-title">
+            <span className="navbar-system-name">iSKan</span>
+            <span className="navbar-system-role">
+              {role === 1 ? "SK Chairman Dashboard" : "SK Kagawad Dashboard"}
             </span>
           </div>
         </div>
 
         {/* CENTER SEARCH */}
-        <div className="nav-search">
-          <FaSearch className="search-icon"/>
-          <input
-            type="text"
-            placeholder="Search Youth by Name"
-          />
+        <div className="navbar-search">
+          <FaSearch className="navbar-search-icon" />
+          <input type="text" placeholder="Search Youth by Name" />
         </div>
 
         {/* RIGHT SIDE */}
-        <div className="nav-right">
-
-          {/* ADDED: Click event and button wrapper for the Bell */}
-          <button className="nav-btn" onClick={toggleNotifications}>
-            <FaBell className="nav-icon"/>
+        <div className="navbar-right">
+          <button className="navbar-btn" onClick={toggleNotifications}>
+            <FaBell className="navbar-icon" />
+            {unreadCount > 0 && (
+              <span className="navbar-notification-badge">{unreadCount}</span>
+            )}
           </button>
 
-          <button className="nav-btn" onClick={Settings}> 
-            <FaCog className="nav-icon"/> 
+          <button className="navbar-btn" onClick={Settings}>
+            <FaCog className="navbar-icon" />
           </button>
 
-          <div className="user-section">
-            <div className="user-avatar">
-              {user.name.charAt(0)}
-            </div>
-
-            <div className="user-info">
-              <span className="user-name">{user.name}</span>
-              <span className="user-role">
-                {user.role === "chairman"
-                  ? "SK Chairman"
-                  : "SK Kagawad"}
+          <div className="navbar-user-section">
+            <div className="navbar-avatar">{getUserInitials()}</div>
+            <div className="navbar-user-info">
+              <span className="navbar-user-name">{name}</span>
+              <span className="navbar-user-role">
+                {role === 1 ? "SK Chairman" : "SK Kagawad"}
               </span>
             </div>
           </div>
 
-          <button className="logout-btn" onClick={logout}>
-            <FaSignOutAlt/>
+          <button className="navbar-logout-btn" onClick={logout}>
+            <FaSignOutAlt />
           </button>
-
         </div>
       </div>
 
-      {/* --- NOTIFICATION DRAWER SECTION --- */}
-
-      {/* 1. Dark Overlay (Clicks here close the drawer) */}
+      {/* NOTIFICATION DRAWER */}
       {isNotificationOpen && (
-        <div 
-          className="drawer-overlay" 
-          onClick={() => setIsNotificationOpen(false)}
-        ></div>
+        <div className="navbar-drawer-overlay" onClick={() => setIsNotificationOpen(false)}></div>
       )}
 
-      {/* 2. The Sliding Drawer */}
-      <div className={`notification-drawer ${isNotificationOpen ? 'open' : ''}`}>
-        
-        <div className="drawer-header">
+      <div className={`navbar-notification-drawer ${isNotificationOpen ? "open" : ""}`}>
+        <div className="navbar-drawer-header">
           <h3>Notifications</h3>
-          <button className="close-button" onClick={() => setIsNotificationOpen(false)}>
+          <button className="navbar-close-button" onClick={() => setIsNotificationOpen(false)}>
             ✖
           </button>
         </div>
-
-        <div className="drawer-content">
-          {/* Example Notifications */}
-          <div className="notification-card">
-            <p>New youth registration awaiting approval.</p>
-            <span className="time-stamp">5 mins ago</span>
-          </div>
-          <div className="notification-card">
-            <p>System maintenance completed.</p>
-            <span className="time-stamp">1 hour ago</span>
-          </div>
+        <div className="navbar-drawer-content">
+          {notifications.length > 0 ? (
+            notifications.map((notif, index) => (
+              <div key={index} className="navbar-notification-card">
+                <p>{notif.message}</p>
+                <span className="navbar-time-stamp">
+                  {new Date(notif.created_at).toLocaleString()}
+                </span>
+              </div>
+            ))
+          ) : (
+            <div className="navbar-empty-notifications">
+              <p>No notifications yet</p>
+            </div>
+          )}
         </div>
-
       </div>
     </>
   );

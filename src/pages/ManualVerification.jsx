@@ -15,39 +15,52 @@ import "../styles/ManualVerification.css";
 export default function ManualVerification() {
   const navigate = useNavigate();
 
-  const [searchTerm, setSearchTerm]                   = useState("");
-  const [searchResults, setSearchResults]             = useState([]);
-  const [selectedYouth, setSelectedYouth]             = useState(null);
-  const [isLoading, setIsLoading]                     = useState(false);
-  const [verifying, setVerifying]                     = useState(false);
-  const [programs, setPrograms]                       = useState([]);
-  const [selectedProgram, setSelectedProgram]         = useState("");
-  const [verificationNote, setVerificationNote]       = useState("");
-  const [verificationResult, setVerificationResult]   = useState(null);
-  const [identityConfirmed, setIdentityConfirmed]     = useState(false);
-  const [confirmMethod, setConfirmMethod]             = useState("");
-  const [confirmInput, setConfirmInput]               = useState("");
-  const [selectedReason, setSelectedReason]           = useState("");
-  const [customReason, setCustomReason]               = useState("");
-  const [todayAttendance, setTodayAttendance]         = useState(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [searchResults, setSearchResults] = useState([]);
+  const [selectedYouth, setSelectedYouth] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [verifying, setVerifying] = useState(false);
+  const [programs, setPrograms] = useState([]);
+  const [selectedProgram, setSelectedProgram] = useState("");
+  const [verificationNote, setVerificationNote] = useState("");
+  const [verificationResult, setVerificationResult] = useState(null);
+  const [identityConfirmed, setIdentityConfirmed] = useState(false);
+  const [confirmMethod, setConfirmMethod] = useState("");
+  const [confirmInput, setConfirmInput] = useState("");
+  const [selectedReason, setSelectedReason] = useState("");
+  const [customReason, setCustomReason] = useState("");
+  const [todayAttendance, setTodayAttendance] = useState(null);
   const [verificationHistory, setVerificationHistory] = useState([]);
-  const [showHistory, setShowHistory]                 = useState(false);
-  const [userRole, setUserRole]                       = useState(null);
+  const [showHistory, setShowHistory] = useState(false);
+  const [userRole, setUserRole] = useState(null);
+  const [user, setUser] = useState(null);
 
-  // ─── Init ────────────────────────────────────────────────────────────────
+  // Load authenticated user FIRST
   useEffect(() => {
-    fetchPrograms();
-    getUserRole();
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setUser(user);
+      console.log("USER:", user);
+    };
+    getUser();
   }, []);
+
+  // Init other data after user is loaded
+  useEffect(() => {
+    if (user) {
+      fetchPrograms();
+      getUserRole();
+    }
+  }, [user]);
 
   const getUserRole = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      if (currentUser) {
         const { data } = await supabase
           .from("users")
           .select("role_id")
-          .eq("user_id", user.id)
+          .eq("user_id", currentUser.id)
           .single();
         setUserRole(data?.role_id ?? null);
       }
@@ -56,65 +69,90 @@ export default function ManualVerification() {
     }
   };
 
+  // FIXED: Use .ilike() for case-insensitive status matching
   const fetchPrograms = async () => {
     try {
       const { data, error } = await supabase
         .from("programs")
         .select("*")
-        .eq("status", "Active");
+        .ilike("status", "active");
+      
       if (error) throw error;
       setPrograms(data || []);
+      console.log("PROGRAMS LOADED:", data);
     } catch (err) {
       console.error("fetchPrograms:", err);
+      setPrograms([]);
     }
   };
 
-  // ─── Search ──────────────────────────────────────────────────────────────
-  // Avoids .or() quirks by running two parallel .ilike() queries and merging
+  // Search Youth - FIXED .or() query
   const searchYouth = async () => {
+    if (!user) {
+      console.warn("User not authenticated yet");
+      return;
+    }
+
     if (!searchTerm.trim()) {
       setSearchResults([]);
       return;
     }
+    
     setIsLoading(true);
     try {
       const term = `%${searchTerm.trim()}%`;
-      const [r1, r2] = await Promise.all([
-        supabase.from("youth").select("*, programs(program_name)").ilike("first_name", term).limit(10),
-        supabase.from("youth").select("*, programs(program_name)").ilike("last_name",  term).limit(10),
-      ]);
-      if (r1.error) console.error("Search (first_name) error:", r1.error);
-      if (r2.error) console.error("Search (last_name) error:",  r2.error);
+      
+      const { data, error } = await supabase
+        .from("youth")
+        .select("*")
+        .or(`first_name.ilike.${term},last_name.ilike.${term},email.ilike.${term}`)
+        .limit(10);
 
-      const combined = [...(r1.data || []), ...(r2.data || [])];
-      const unique   = Array.from(new Map(combined.map((y) => [y.id, y])).values());
-      setSearchResults(unique.slice(0, 10));
+      if (error) {
+        console.error("Search error:", error);
+        setSearchResults([]);
+      } else {
+        console.log("SEARCH RESULTS:", data);
+        setSearchResults(data || []);
+      }
     } catch (err) {
       console.error("searchYouth:", err);
+      setSearchResults([]);
     } finally {
       setIsLoading(false);
     }
   };
 
+  // Only trigger search when user is authenticated
   useEffect(() => {
     const t = setTimeout(() => {
-      searchTerm ? searchYouth() : setSearchResults([]);
+      if (searchTerm && user) {
+        searchYouth();
+      } else if (!searchTerm) {
+        setSearchResults([]);
+      }
     }, 400);
     return () => clearTimeout(t);
-  }, [searchTerm]);
+  }, [searchTerm, user]);
 
-  // ─── Attendance helpers ──────────────────────────────────────────────────
+  // FIXED: Attendance helper with guard against empty programId
   const checkTodayAttendance = async (youthId, programId) => {
-    if (!youthId || !programId) return null;
+    // Guard against empty programId
+    if (!youthId || !programId || programId === "") {
+      console.log("Missing youthId or programId:", { youthId, programId });
+      return null;
+    }
+    
     try {
       const today = new Date().toISOString().split("T")[0];
       const { data, error } = await supabase
-        .from("attendance")                       // ✅ correct table
+        .from("attendance")
         .select("*")
         .eq("youth_id", youthId)
         .eq("program_id", programId)
         .gte("scanned_at", today)
         .lte("scanned_at", `${today}T23:59:59`);
+      
       if (error) throw error;
       return data?.length > 0 ? data[0] : null;
     } catch (err) {
@@ -139,7 +177,7 @@ export default function ManualVerification() {
     }
   };
 
-  // ─── Select youth ────────────────────────────────────────────────────────
+  // Select youth
   const handleSelectYouth = async (youth) => {
     setSelectedYouth(youth);
     setIdentityConfirmed(false);
@@ -149,16 +187,17 @@ export default function ManualVerification() {
     setCustomReason("");
     setVerificationResult(null);
     setTodayAttendance(null);
-    setSearchResults([]);   // collapse results after picking
+    setSearchResults([]);
 
-    if (selectedProgram) {
+    // Only check attendance if a program is selected
+    if (selectedProgram && selectedProgram !== "") {
       const att = await checkTodayAttendance(youth.id, selectedProgram);
       setTodayAttendance(att);
     }
     await fetchVerificationHistory(youth.id);
   };
 
-  // ─── Confirm identity ────────────────────────────────────────────────────
+  // Confirm identity
   const handleConfirmIdentity = () => {
     if (!confirmMethod) {
       alert("Please select a verification method");
@@ -178,19 +217,19 @@ export default function ManualVerification() {
     if (valid) {
       setIdentityConfirmed(true);
       logActivity({
-        action:   "IDENTITY_CONFIRMED",
-        table:    "youth",
+        action: "IDENTITY_CONFIRMED",
+        table: "youth",
         recordId: selectedYouth.id,
-        details:  `Identity confirmed via ${confirmMethod} for manual verification`,
+        details: `Identity confirmed via ${confirmMethod} for manual verification`,
       });
     }
   };
 
-  // ─── Mark attendance ─────────────────────────────────────────────────────
+  // Mark attendance
   const handleMarkAttendance = async () => {
     if (!selectedYouth || !selectedProgram) { alert("Please select a youth and program"); return; }
-    if (!identityConfirmed)                 { alert("Please confirm the youth's identity first"); return; }
-    if (!selectedReason)                    { alert("Please select a reason for manual verification"); return; }
+    if (!identityConfirmed) { alert("Please confirm the youth's identity first"); return; }
+    if (!selectedReason) { alert("Please select a reason for manual verification"); return; }
 
     const finalReason = selectedReason === "Other" ? customReason : selectedReason;
     if (!finalReason) { alert("Please provide a reason for manual verification"); return; }
@@ -204,18 +243,16 @@ export default function ManualVerification() {
 
     setVerifying(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
 
-      // ✅ Insert into attendance — columns match schema (including reason + verified_by from ALTER)
       const { data: attendance, error } = await supabase
         .from("attendance")
         .insert([{
-          youth_id:    selectedYouth.id,
-          program_id:  selectedProgram,
-          method:      "manual",      // CHECK ('qr','manual')
-          reason:      finalReason,
-          verified_by: user?.id,
-          // scanned_at defaults to NOW()
+          youth_id: selectedYouth.id,
+          program_id: selectedProgram,
+          method: "manual",
+          reason: finalReason,
+          verified_by: currentUser?.id,
         }])
         .select()
         .single();
@@ -223,10 +260,10 @@ export default function ManualVerification() {
       if (error) throw error;
 
       await logActivity({
-        action:   "MANUAL_VERIFY",
-        table:    "attendance",
+        action: "MANUAL_VERIFY",
+        table: "attendance",
         recordId: attendance.id,
-        details:  `Manual verification for ${selectedYouth.first_name} ${selectedYouth.last_name} — Reason: ${finalReason}${verificationNote ? ` | Notes: ${verificationNote}` : ""}`,
+        details: `Manual verification for ${selectedYouth.first_name} ${selectedYouth.last_name} — Reason: ${finalReason}${verificationNote ? ` | Notes: ${verificationNote}` : ""}`,
       });
 
       setVerificationResult({ success: true, message: "Attendance recorded successfully!" });
@@ -247,10 +284,10 @@ export default function ManualVerification() {
     } catch (err) {
       console.error("handleMarkAttendance:", err);
       await logActivity({
-        action:   "MANUAL_VERIFY_FAILED",
-        table:    "attendance",
+        action: "MANUAL_VERIFY_FAILED",
+        table: "attendance",
         recordId: null,
-        details:  `Failed to verify ${selectedYouth?.first_name} ${selectedYouth?.last_name} — ${err.message}`,
+        details: `Failed to verify ${selectedYouth?.first_name} ${selectedYouth?.last_name} — ${err.message}`,
       });
       setVerificationResult({ success: false, message: err.message || "Failed to record attendance." });
       setTimeout(() => setVerificationResult(null), 3500);
@@ -259,7 +296,7 @@ export default function ManualVerification() {
     }
   };
 
-  // ─── Helpers ─────────────────────────────────────────────────────────────
+  // Helpers
   const getAge = (birthdate) => {
     if (!birthdate) return "N/A";
     const today = new Date(), birth = new Date(birthdate);
@@ -271,13 +308,12 @@ export default function ManualVerification() {
 
   const formatDate = (d) => new Date(d).toLocaleString();
 
-  // 🟢 QR  🟡 Manual badges — add .badge-qr / .badge-manual to your CSS
   const MethodBadge = ({ method }) =>
     method === "manual"
       ? <span className="badge-manual">🟡 Manual</span>
       : <span className="badge-qr">🟢 QR Scan</span>;
 
-  // ─── Access guard ─────────────────────────────────────────────────────────
+  // Access guard
   if (userRole !== null && userRole !== 1) {
     return (
       <>
@@ -294,15 +330,14 @@ export default function ManualVerification() {
     );
   }
 
-  // ─── Render ───────────────────────────────────────────────────────────────
+  // Render
   return (
     <>
       <Navbar />
       <div className="manual-verification-container">
 
-        {/* ── Header ── */}
+        {/* Header */}
         <div className="page-header">
-          {/* Icon-only back button */}
           <button
             className="back-btn icon-only"
             onClick={() => navigate(-1)}
@@ -319,17 +354,17 @@ export default function ManualVerification() {
 
         <div className="verification-content">
 
-          {/* ── Search ── */}
+          {/* Search Section */}
           <div className="search-section">
             <div className="search-card">
               <h3><FaSearch /> Search Youth</h3>
-              <p className="search-hint">Search by first name or last name</p>
+              <p className="search-hint">Search by first name, last name, or email</p>
 
               <div className="search-input-wrapper">
                 <FaSearch className="search-icon" />
                 <input
                   type="text"
-                  placeholder="Enter youth name..."
+                  placeholder="Enter youth name or email..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="search-input"
@@ -375,13 +410,13 @@ export default function ManualVerification() {
               {searchTerm && !isLoading && searchResults.length === 0 && (
                 <div className="no-results">
                   <FaExclamationTriangle />
-                  <p>No youth found. Try a different name.</p>
+                  <p>No youth found. Try a different name or email.</p>
                 </div>
               )}
             </div>
           </div>
 
-          {/* ── Verification Form ── */}
+          {/* Verification Form */}
           {selectedYouth && (
             <div className="verification-section">
               <div className="verification-card">
@@ -396,7 +431,7 @@ export default function ManualVerification() {
                   </button>
                 </div>
 
-                {/* ── Youth Details ── */}
+                {/* Youth Details */}
                 <div className="youth-details">
                   <h4>Youth Information</h4>
                   <div className="details-grid">
@@ -459,7 +494,7 @@ export default function ManualVerification() {
                   </div>
                 </div>
 
-                {/* ── Step 1: Confirm Identity ── */}
+                {/* Step 1: Confirm Identity */}
                 {!identityConfirmed ? (
                   <div className="identity-confirmation">
                     <h4>Step 1 — Confirm Identity</h4>
@@ -545,7 +580,7 @@ export default function ManualVerification() {
                   </div>
                 )}
 
-                {/* ── Step 2: Record Attendance ── */}
+                {/* Step 2: Record Attendance */}
                 {identityConfirmed && (
                   <div className="verification-form">
                     <h4>Step 2 — Record Attendance</h4>
@@ -555,9 +590,12 @@ export default function ManualVerification() {
                       <select
                         value={selectedProgram}
                         onChange={async (e) => {
-                          setSelectedProgram(e.target.value);
-                          const att = await checkTodayAttendance(selectedYouth.id, e.target.value);
-                          setTodayAttendance(att);
+                          const programId = e.target.value;
+                          setSelectedProgram(programId);
+                          if (selectedYouth && programId) {
+                            const att = await checkTodayAttendance(selectedYouth.id, programId);
+                            setTodayAttendance(att);
+                          }
                         }}
                         className="form-select"
                       >
@@ -647,7 +685,7 @@ export default function ManualVerification() {
                   </div>
                 )}
 
-                {/* ── Result ── */}
+                {/* Result */}
                 {verificationResult && (
                   <div className={`verification-result ${verificationResult.success ? "success" : "error"}`}>
                     {verificationResult.success
@@ -657,7 +695,7 @@ export default function ManualVerification() {
                   </div>
                 )}
 
-                {/* ── History ── */}
+                {/* History */}
                 {showHistory && (
                   <div className="history-section">
                     <h4>Manual Verification History</h4>
@@ -681,7 +719,7 @@ export default function ManualVerification() {
           )}
         </div>
 
-        {/* ── Guidelines ── */}
+        {/* Guidelines */}
         <div className="help-section">
           <div className="help-card">
             <h4>Manual Verification Guidelines</h4>

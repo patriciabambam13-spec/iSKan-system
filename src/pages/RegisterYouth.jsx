@@ -379,10 +379,8 @@ export default function RegisterYouth() {
     <> 
       <Navbar/>
       
-      {/* Main Container - matches manage youth */}
       <div className="register-container">
         
-        {/* Header - matches manage youth exactly */}
         <div className="page-header">
           <button className="back-btn" aria-label="Go back" onClick={() => navigate(-1)}>←</button>
           <div className="header-text">
@@ -401,35 +399,35 @@ export default function RegisterYouth() {
             <div className="grid-3">
               <div>
                 <label>First Name <span className="req">*</span></label>
-                <input name="first_name" value={formData.first_name} onChange={handleChange}/>
+                <input className="input" name="first_name" value={formData.first_name} onChange={handleChange}/>
                 {errors.first_name && <p className="error">{errors.first_name}</p>}
               </div>
 
               <div>
                 <label>Middle Name</label>
-                <input name="middle_name" value={formData.middle_name} onChange={handleChange}/>
+                <input className="input" name="middle_name" value={formData.middle_name} onChange={handleChange}/>
               </div>
 
               <div>
                 <label>Last Name <span className="req">*</span></label>
-                <input name="last_name" value={formData.last_name} onChange={handleChange}/>
+                <input className="input" name="last_name" value={formData.last_name} onChange={handleChange}/>
                 {errors.last_name && <p className="error">{errors.last_name}</p>}
               </div>
 
               <div>
                 <label>Birth Date <span className="req">*</span></label>
-                <input type="date" name="birthdate" value={formData.birthdate} onChange={handleChange}/>
+                <input className="input" type="date" name="birthdate" value={formData.birthdate} onChange={handleChange}/>
                 {errors.birthdate && <p className="error">{errors.birthdate}</p>}
               </div>
 
               <div>
                 <label>Age</label>
-                <input value={formData.age} disabled className="disabled-field"/>
+                <input className="input disabled-field" value={formData.age} disabled/>
               </div>
 
               <div>
                 <label>Gender <span className="req">*</span></label>
-                <select name="gender" value={formData.gender} onChange={handleChange}>
+                <select className="input" name="gender" value={formData.gender} onChange={handleChange}>
                   <option value="">Select</option>
                   <option>Male</option>
                   <option>Female</option>
@@ -448,25 +446,25 @@ export default function RegisterYouth() {
 
             <div>
               <label>Complete Address <span className="req">*</span></label>
-              <textarea name="address" value={formData.address} onChange={handleChange}/>
+              <textarea className="input" name="address" value={formData.address} onChange={handleChange}/>
               {errors.address && <p className="error">{errors.address}</p>}
             </div>
 
             <div className="grid-3">
               <div>
                 <label>Purok / Zone <span className="req">*</span></label>
-                <input name="purok" value={formData.purok} onChange={handleChange}/>
+                <input className="input" name="purok" value={formData.purok} onChange={handleChange}/>
                 {errors.purok && <p className="error">{errors.purok}</p>}
               </div>
 
               <div>
                 <label>Barangay</label>
-                <input value="Barangay Pinagkaisahan" disabled className="disabled-field"/>
+                <input className="input disabled-field" value="Barangay Pinagkaisahan" disabled/>
               </div>
 
               <div>
                 <label>Residency Status <span className="req">*</span></label>
-                <select name="residency_status" value={formData.residency_status} onChange={handleChange}>
+                <select className="input" name="residency_status" value={formData.residency_status} onChange={handleChange}>
                   <option value="">Select</option>
                   <option>Permanent</option>
                   <option>Temporary</option>
@@ -479,6 +477,7 @@ export default function RegisterYouth() {
               <div>
                 <label>Years of Residency (Optional)</label>
                 <input
+                  className="input"
                   type="number"
                   name="years_residency"
                   value={formData.years_residency}
@@ -490,11 +489,11 @@ export default function RegisterYouth() {
               <div>
                 <label>ZIP Code</label>
                 <input
+                  className="input disabled-field"
                   type="text"
                   name="zip_code"
                   value={formData.zip_code}
                   disabled
-                  className="disabled-field"
                   placeholder="1111"
                 />
               </div>
@@ -511,13 +510,14 @@ export default function RegisterYouth() {
             <div className="grid-2">
               <div>
                 <label>Contact Number <span className="req">*</span></label>
-                <input name="contact" value={formData.contact} onChange={handleChange}/>
+                <input className="input" name="contact" value={formData.contact} onChange={handleChange}/>
                 {errors.contact && <p className="error">{errors.contact}</p>}
               </div>
 
               <div>
                 <label>Email <span className="req">*</span></label>
                 <input 
+                  className="input"
                   type="email"
                   name="email" 
                   value={formData.email} 
@@ -539,7 +539,7 @@ export default function RegisterYouth() {
             <div className="grid-2">
               <div>
                 <label>Type of ID presented <span className="req">*</span></label>
-                <select name="id_type" value={formData.id_type} onChange={handleChange}>
+                <select className="input" name="id_type" value={formData.id_type} onChange={handleChange}>
                   <option value="">Select</option>
                   <option>National ID</option>
                   <option>School ID</option>
@@ -550,7 +550,7 @@ export default function RegisterYouth() {
 
               <div>
                 <label>ID Number (Optional)</label>
-                <input name="id_number" value={formData.id_number} onChange={handleChange}/>
+                <input className="input" name="id_number" value={formData.id_number} onChange={handleChange}/>
               </div>
             </div>
           </div>
@@ -574,14 +574,14 @@ export default function RegisterYouth() {
                     facingMode: "user"
                   }}
                 />
-                <button type="button" onClick={capturePhoto} className="capture-btn">
+                <button type="button" onClick={capturePhoto} className="btn btn-accent" style={{ marginTop: "12px" }}>
                   Capture Photo
                 </button>
               </>
             ) : (
               <div className="photo-preview">
                 <img src={photo} alt="Captured" className="captured-photo" />
-                <button type="button" onClick={() => setPhoto(null)} className="retake-btn">
+                <button type="button" onClick={() => setPhoto(null)} className="btn" style={{ marginTop: "12px" }}>
                   Retake Photo
                 </button>
               </div>
@@ -604,25 +604,25 @@ export default function RegisterYouth() {
           </div>
           {errors.confirmed && <p className="error center">{errors.confirmed}</p>}
 
-          {/* Buttons */}
+          {/* Buttons - USING GLOBAL BUTTON SYSTEM */}
           <div className="form-buttons">
-            <button type="button" className="cancel-btn" onClick={handleCancel} disabled={isSubmitting}>
+            <button type="button" className="btn" style={{ background: "var(--danger)", color: "white" }} onClick={handleCancel} disabled={isSubmitting}>
               Cancel
             </button>
 
-            <button type="button" className="clear-btn" onClick={clearForm} disabled={isSubmitting}>
+            <button type="button" className="btn" onClick={clearForm} disabled={isSubmitting}>
               Clear Form
             </button>
 
-            <button type="submit" className="save-btn" disabled={isSubmitting}>
+            <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
               {isSubmitting ? "Saving..." : "Save & Generate QR"}
             </button>
           </div>
         </form>
 
-        {/* QR Modal */}
+        {/* QR Modal - USING GLOBAL MODAL SYSTEM */}
         {showQR && qrCode && (
-          <div className="overlay">
+          <div className="modal-overlay">
             <div className="qr-modal">
               <h2 className="qr-title">Youth Successfully Registered!</h2>
               <p className="qr-sub">
@@ -641,15 +641,15 @@ export default function RegisterYouth() {
               </div>
 
               <div className="qr-buttons">
-                <button className="btn-print" onClick={() => window.print()}>
+                <button className="btn btn-accent" onClick={() => window.print()}>
                   <FaPrint /> Print QR
                 </button>
 
-                <button className="btn-download" onClick={() => navigator.clipboard.writeText(qrCode)}>
+                <button className="btn" onClick={() => navigator.clipboard.writeText(qrCode)}>
                   <FaDownload /> Download QR
                 </button>
 
-                <button className="btn-register" onClick={registerAnother}>
+                <button className="btn btn-primary" onClick={registerAnother}>
                   <FaUserPlus /> Register Another
                 </button>
               </div>

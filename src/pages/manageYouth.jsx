@@ -69,6 +69,7 @@ const EditModal = memo(({ show, youth, onClose, onSave }) => {
           <div className="form-group">
             <label>First Name <span className="req">*</span></label>
             <input 
+              className="input"
               value={formData.first_name} 
               onChange={(e) => handleChange("first_name", e.target.value)} 
               required 
@@ -78,6 +79,7 @@ const EditModal = memo(({ show, youth, onClose, onSave }) => {
           <div className="form-group">
             <label>Last Name <span className="req">*</span></label>
             <input 
+              className="input"
               value={formData.last_name} 
               onChange={(e) => handleChange("last_name", e.target.value)} 
               required 
@@ -88,6 +90,7 @@ const EditModal = memo(({ show, youth, onClose, onSave }) => {
             <div className="form-group">
               <label>Gender</label>
               <select 
+                className="input"
                 value={formData.gender} 
                 onChange={(e) => handleChange("gender", e.target.value)}
               >
@@ -98,6 +101,7 @@ const EditModal = memo(({ show, youth, onClose, onSave }) => {
             <div className="form-group">
               <label>Status</label>
               <select 
+                className="input"
                 value={formData.status} 
                 onChange={(e) => handleChange("status", e.target.value)}
               >
@@ -110,6 +114,7 @@ const EditModal = memo(({ show, youth, onClose, onSave }) => {
           <div className="form-group">
             <label>Contact Number</label>
             <input 
+              className="input"
               value={formData.contact} 
               onChange={(e) => handleChange("contact", e.target.value)} 
             />
@@ -118,6 +123,7 @@ const EditModal = memo(({ show, youth, onClose, onSave }) => {
           <div className="form-group">
             <label>Email Address</label>
             <input 
+              className="input"
               type="email" 
               value={formData.email} 
               onChange={(e) => handleChange("email", e.target.value)} 
@@ -127,6 +133,7 @@ const EditModal = memo(({ show, youth, onClose, onSave }) => {
           <div className="form-group">
             <label>Address</label>
             <textarea 
+              className="input"
               value={formData.address} 
               onChange={(e) => handleChange("address", e.target.value)} 
               rows="3" 
@@ -134,8 +141,8 @@ const EditModal = memo(({ show, youth, onClose, onSave }) => {
           </div>
           
           <div className="modal-actions">
-            <button type="button" className="cancel-btn" onClick={onClose}>Cancel</button>
-            <button type="submit" className="save-btn">Save Changes</button>
+            <button type="button" className="btn" onClick={onClose}>Cancel</button>
+            <button type="submit" className="btn btn-primary">Save Changes</button>
           </div>
         </form>
       </div>
@@ -163,8 +170,8 @@ const DeleteModal = memo(({ show, name, onClose, onConfirm }) => {
         </div>
         
         <div className="modal-actions delete-modal-actions">
-          <button type="button" className="cancel-btn" onClick={onClose}>Cancel</button>
-          <button type="button" className="delete-confirm-btn" onClick={onConfirm}>Delete Permanently</button>
+          <button type="button" className="btn" onClick={onClose}>Cancel</button>
+          <button type="button" className="btn" style={{ background: "var(--danger)", color: "white" }} onClick={onConfirm}>Delete Permanently</button>
         </div>
       </div>
     </div>,
@@ -174,19 +181,16 @@ const DeleteModal = memo(({ show, name, onClose, onConfirm }) => {
 
 // Main Component
 export default function ManageYouth() {
-  // State
   const [youths, setYouths] = useState([]);
   const [totalCount, setTotalCount] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   
-  // Filters
   const [searchInput, setSearchInput] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [genderFilter, setGenderFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [page, setPage] = useState(1);
   
-  // Modals
   const [selectedYouth, setSelectedYouth] = useState(null);
   const [transactions, setTransactions] = useState([]);
   const [activeTab, setActiveTab] = useState("details");
@@ -199,11 +203,9 @@ export default function ManageYouth() {
   const navigate = useNavigate();
   const debounceTimer = useRef(null);
   
-  // Helpers
   const formatDate = (date) => date ? new Date(date).toLocaleDateString() : "-";
   const getFullName = (youth) => `${youth?.first_name || ''} ${youth?.last_name || ''}`.trim();
   
-  // Fetch youth
   const fetchYouth = useCallback(async () => {
     setIsLoading(true);
     
@@ -255,7 +257,6 @@ export default function ManageYouth() {
     }
   }, [searchTerm, genderFilter, statusFilter, page]);
   
-  // Fetch transactions
   const fetchTransactions = async (youthId) => {
     try {
       const { data, error } = await supabase
@@ -272,7 +273,6 @@ export default function ManageYouth() {
     }
   };
   
-  // Delete youth with audit log
   const handleDelete = async () => {
     if (!deleteTarget) {
       toast.error("No record selected");
@@ -290,10 +290,7 @@ export default function ManageYouth() {
         .eq("id", deleteId)
         .select();
       
-      console.log("DELETE RESULT:", data, error);
-      
       if (error) {
-        console.error("Delete error:", error);
         toast.error(`Delete failed: ${error.message}`, { id: loadingToast });
         return;
       }
@@ -302,7 +299,6 @@ export default function ManageYouth() {
         throw new Error("No row deleted. Check RLS policy or ID.");
       }
       
-      // Log the delete activity
       await logActivity({
         action: "DELETE",
         table: "youth",
@@ -333,7 +329,6 @@ export default function ManageYouth() {
     }
   };
   
-  // Update youth with audit log
   const handleUpdate = async (formData) => {
     const oldData = editTarget;
     const loadingToast = toast.loading("Updating youth record...");
@@ -355,7 +350,6 @@ export default function ManageYouth() {
       
       if (error) throw error;
       
-      // Log the update activity
       await logActivity({
         action: "UPDATE",
         table: "youth",
@@ -379,7 +373,6 @@ export default function ManageYouth() {
     }
   };
   
-  // Handlers
   const handleSearch = () => {
     setSearchTerm(searchInput);
     setPage(1);
@@ -409,7 +402,6 @@ export default function ManageYouth() {
     await fetchTransactions(youth.id);
     setShowView(true);
     
-    // Log view activity (optional - can be commented out if too many logs)
     await logActivity({
       action: "VIEW",
       table: "youth",
@@ -423,7 +415,6 @@ export default function ManageYouth() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
   
-  // Stats
   const totalPages = Math.ceil(totalCount / PAGE_SIZE);
   const attendance = transactions.filter(t => t.type === "Attendance");
   const stats = {
@@ -432,7 +423,6 @@ export default function ManageYouth() {
     requests: transactions.filter(t => t.type !== "Attendance").length
   };
   
-  // Effects
   useEffect(() => {
     fetchYouth();
   }, [fetchYouth]);
@@ -454,7 +444,6 @@ export default function ManageYouth() {
     return () => { document.body.style.overflow = "auto"; };
   }, [showView, showEdit, showDelete]);
   
-  // Export
   const exportCSV = () => {
     const headers = ["Full Name", "QR Code", "Age", "Gender", "Status", "Contact", "Email", "Date Registered"];
     const rows = youths.map(y => [
@@ -471,7 +460,6 @@ export default function ManageYouth() {
     URL.revokeObjectURL(link.href);
     toast.success("CSV exported!");
     
-    // Log export activity
     logActivity({
       action: "EXPORT",
       table: "youth",
@@ -483,7 +471,6 @@ export default function ManageYouth() {
   const exportPDF = () => {
     window.print();
     
-    // Log export activity
     logActivity({
       action: "EXPORT",
       table: "youth",
@@ -492,7 +479,6 @@ export default function ManageYouth() {
     });
   };
   
-  // Pagination
   const renderPagination = () => {
     if (totalPages <= 1) return null;
     
@@ -520,7 +506,6 @@ export default function ManageYouth() {
     );
   };
   
-  // View Modal
   const ViewModal = () => {
     if (!showView || !selectedYouth) return null;
     
@@ -606,8 +591,8 @@ export default function ManageYouth() {
           </div>
           
           <div className="modal-footer">
-            <button className="btn-secondary" onClick={() => setShowView(false)}>Close</button>
-            <button className="btn-primary" onClick={() => { setShowView(false); handleOpenEdit(selectedYouth); }}>Edit Profile</button>
+            <button className="btn" onClick={() => setShowView(false)}>Close</button>
+            <button className="btn btn-primary" onClick={() => { setShowView(false); handleOpenEdit(selectedYouth); }}>Edit Profile</button>
           </div>
         </div>
       </div>,
@@ -615,66 +600,62 @@ export default function ManageYouth() {
     );
   };
   
-  // Main render
   return (
     <>
       <Navbar />
       <Toaster position="top-center" />
       
       <div className="manage-youth-container">
-        {/* Header */}
         <div className="page-header">
           <button className="back-btn" onClick={() => navigate(-1)}>←</button>
           <div className="header-text">
             <h2>Manage Youth</h2>
             <p>View, edit, and manage registered youth records</p>
           </div>
-          <button className="register-btn" onClick={() => navigate('/register-youth')}>
+          <button className="btn btn-primary register-btn-custom" onClick={() => navigate('/register-youth')}>
             <FaUserPlus /> Register New Youth
           </button>
         </div>
-        
-        {/* Filters */}
+          
         <div className="filter-section">
           <div className="search-box">
             <FaSearch className="search-icon" />
             <input
+              className="input"
               placeholder="Search by name or QR code..."
               value={searchInput}
               onChange={e => setSearchInput(e.target.value)}
               onKeyPress={e => e.key === 'Enter' && handleSearch()}
             />
-            <button type="button" className="search-submit" onClick={handleSearch}>Search</button>
+            <button type="button" className="btn btn-accent" onClick={handleSearch}>Search</button>
           </div>
           
-          <select value={genderFilter} onChange={e => setGenderFilter(e.target.value)}>
+          <select className="input" value={genderFilter} onChange={e => setGenderFilter(e.target.value)}>
             <option value="">All Gender</option>
             <option value="Male">Male</option>
             <option value="Female">Female</option>
           </select>
           
-          <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
+          <select className="input" value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
             <option value="">All Status</option>
             <option value="Active">Active</option>
             <option value="Inactive">Inactive</option>
           </select>
           
-          <button className="clear-filters-btn" onClick={handleClearFilters}>Clear Filters</button>
+          <button className="btn" onClick={handleClearFilters}>Clear Filters</button>
         </div>
         
-        {/* Record bar */}
         <div className="record-bar">
           <div className="record-info">
             <span className="record-count">{totalCount}</span>
             <span>youth records found</span>
           </div>
           <div className="export-buttons">
-            <button className="export-btn csv" onClick={exportCSV}><FaFileCsv /> CSV</button>
-            <button className="export-btn pdf" onClick={exportPDF}><FaFilePdf /> PDF</button>
+            <button className="btn btn-accent" onClick={exportCSV}><FaFileCsv /> CSV</button>
+            <button className="btn" style={{ background: "var(--danger)", color: "white" }} onClick={exportPDF}><FaFilePdf /> PDF</button>
           </div>
         </div>
         
-        {/* Table */}
         <div className="table-container">
           {isLoading ? (
             <div className="loading-state"><div className="spinner"></div><p>Loading...</p></div>
@@ -699,7 +680,7 @@ export default function ManageYouth() {
                         ) : (
                           <div className="photo-placeholder"><FaUser /></div>
                         )}
-                       </td>
+                      </td>
                       <td className="name-cell"><div className="youth-name">{getFullName(youth)}</div></td>
                       <td className="id-cell">{youth.qr_code || '-'}</td>
                       <td className="age-cell">{youth.age || '-'}</td>
@@ -723,11 +704,9 @@ export default function ManageYouth() {
           )}
         </div>
         
-        {/* Pagination */}
         {renderPagination()}
       </div>
       
-      {/* Modals */}
       <ViewModal />
       <EditModal 
         show={showEdit} 

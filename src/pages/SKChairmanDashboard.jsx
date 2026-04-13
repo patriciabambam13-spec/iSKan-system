@@ -216,7 +216,7 @@ export default function SKChairmanDashboard() {
   const menuItems = [
     { name: "Dashboard", icon: FaTachometerAlt, path: "/chairman-dashboard" },
     { name: "Manage Youth", icon: FaUsers, path: "/manage-youth" },
-    { name: "Create Program", icon: FaPlusCircle, path: "/create-programs" },
+    { name: "Manage Program", icon: FaPlusCircle, path: "/manage-programs" },
     { name: "Generate Reports", icon: FaChartLine, path: "/generate-reports" },
     { name: "Audit Logs", icon: FaHistory, path: "/audit-logs" },
     { name: "Manual Verification Youth", icon: FaExclamationTriangle, path: "/manual-verification" },
@@ -381,9 +381,9 @@ export default function SKChairmanDashboard() {
               <span>Manage Youth</span>
             </button>
             
-            <button onClick={() => navigate('/create-programs')} className="action-btn">
-              <img src={icon_createprogram} alt="Create Program" className="action-icon" />
-              <span>Create Program</span>
+            <button onClick={() => navigate('/manage-programs')} className="action-btn">
+              <img src={icon_createprogram} alt="Manage Program" className="action-icon" />
+              <span>Manage Program</span>
             </button>
             
             <button onClick={() => navigate('/generate-reports')} className="action-btn">
