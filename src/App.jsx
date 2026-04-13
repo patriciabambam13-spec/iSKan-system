@@ -8,6 +8,8 @@ import RegisterYouth from "./pages/RegisterYouth";
 import ScanQr from "./pages/ScanQr";
 import CreatePrograms from "./pages/CreatePrograms";
 import ManagePrograms from "./pages/manageprograms";
+import ViewPrograms from "./pages/viewprograms";
+import Transaction from "./pages/transaction";  
 import ManageYouth from "./pages/manageYouth";
 import Settings from "./pages/Settings";
 import GenerateReports from "./pages/GenerateReports";
@@ -27,6 +29,9 @@ function App() {
         <Route path="/scan" element={<ScanQr />} />
         <Route path="/create-programs" element={<CreatePrograms />} />
         <Route path="/manage-programs" element={<ManagePrograms />} />
+        <Route path="/view-programs" element={<ViewPrograms />} />
+        <Route path="/transaction" element={<Transaction />} />
+
         <Route path="/audit-logs" element={<AuditLogs />} /> 
         <Route path="/manage-youth" element={<ManageYouth />} />
         <Route path="/manual-verification" element={<ManualVerification />} />

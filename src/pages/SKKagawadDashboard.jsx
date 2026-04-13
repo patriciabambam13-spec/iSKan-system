@@ -33,6 +33,7 @@ export default function SKKagawadDashboard() {
   const [ongoingPrograms, setOngoingPrograms] = useState([]);
   const [recentScans, setRecentScans] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [weeklyData, setWeeklyData] = useState([0, 0, 0, 0, 0, 0, 0]);
 
   // Role protection
   useEffect(() => {
@@ -72,38 +73,50 @@ export default function SKKagawadDashboard() {
     checkAccess();
   }, [navigate]);
 
-  // Fetch stats
+  // Fetch stats - FIXED
   const fetchStats = async () => {
     try {
+      // Total Youth
       const { count: youthCount } = await supabase
         .from("youth")
         .select("*", { count: "exact", head: true });
 
+      // Upcoming Programs
       const today = new Date().toISOString().split('T')[0];
       const { count: upcomingCount } = await supabase
         .from("programs")
         .select("*", { count: "exact", head: true })
-        .gte("start_date", today);
+        .gte("start_date", today)
+        .eq("program_status", "upcoming");
 
+      // Pending Transactions - FIXED: use 'transaction' table
       const { count: pendingCount } = await supabase
-        .from("transactions")
+        .from("transaction")
         .select("*", { count: "exact", head: true })
-        .eq("status", "pending");
+        .eq("transaction_status", "Pending");
 
-      const { count: overdueCount } = await supabase
-        .from("equipment")
-        .select("*", { count: "exact", head: true })
-        .lt("due_date", today)
-        .eq("status", "borrowed");
+      // Overdue Equipment
+      let overdueCount = 0;
+      const { data: overdueTransactions } = await supabase
+        .from("transaction")
+        .select("id")
+        .eq("service_type", "borrow")
+        .eq("transaction_status", "Approved")
+        .lt("return_date", today);
+      overdueCount = overdueTransactions?.length || 0;
 
+      // Beneficiaries This Month - FIXED
       const startOfMonth = new Date();
       startOfMonth.setDate(1);
+      startOfMonth.setHours(0, 0, 0, 0);
+      
       const { data: beneficiaries } = await supabase
-        .from("transactions")
+        .from("transaction")
         .select("youth_id")
-        .gte("created_at", startOfMonth.toISOString());
+        .gte("created_at", startOfMonth.toISOString())
+        .eq("transaction_status", "Completed");
 
-      const uniqueBeneficiaries = new Set(beneficiaries?.map(b => b.youth_id) || []);
+      const uniqueBeneficiaries = new Set(beneficiaries?.map(b => b.youth_id).filter(id => id) || []);
 
       setStats({
         youth: youthCount || 0,
@@ -118,58 +131,55 @@ export default function SKKagawadDashboard() {
     }
   };
 
+  // Fetch weekly chart data
+  const fetchWeeklyData = async () => {
+    try {
+      const weeklyCounts = [0, 0, 0, 0, 0, 0, 0];
+      
+      const { data: transactions } = await supabase
+        .from("transaction")
+        .select("created_at")
+        .gte("created_at", new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString());
+
+      transactions?.forEach(tx => {
+        const day = new Date(tx.created_at).getDay();
+        weeklyCounts[day]++;
+      });
+
+      setWeeklyData(weeklyCounts);
+    } catch (error) {
+      console.error("Error fetching weekly data:", error);
+    }
+  };
+
+  // Fetch ongoing programs - FIXED
   const fetchOngoingPrograms = async () => {
     try {
       const { data, error } = await supabase
         .from("programs")
-        .select(`
-          program_name,
-          transactions!inner(
-            id,
-            status,
-            created_at,
-            method,
-            youth:youth_id(first_name, last_name)
-          )
-        `)
-        .eq("status", "ongoing")
-        .limit(10);
+        .select("program_name, start_date, end_date, program_status")
+        .eq("program_status", "ongoing")
+        .limit(5);
 
       if (error) throw error;
-
-      const formatted = [];
-      data?.forEach(program => {
-        program.transactions?.forEach(tx => {
-          formatted.push({
-            id: tx.id,
-            youthName: `${tx.youth?.first_name || ''} ${tx.youth?.last_name || ''}`.trim(),
-            programName: program.program_name,
-            time: format(new Date(tx.created_at), "hh:mm a"),
-            method: tx.method || "Manual",
-            status: tx.status
-          });
-        });
-      });
-
-      setOngoingPrograms(formatted);
+      setOngoingPrograms(data || []);
     } catch (error) {
       console.error("Error fetching ongoing programs:", error);
     }
   };
 
+  // Fetch recent scans - FIXED
   const fetchRecentScans = async () => {
     try {
       const { data, error } = await supabase
-        .from("transactions")
+        .from("transaction")
         .select(`
           id,
-          status,
+          transaction_status,
           created_at,
-          method,
-          youth:youth_id(first_name, last_name),
-          program:program_id(program_name)
+          service_type,
+          youth:youth_id(first_name, last_name)
         `)
-        .eq("method", "QR Scan")
         .order("created_at", { ascending: false })
         .limit(10);
 
@@ -177,11 +187,11 @@ export default function SKKagawadDashboard() {
 
       const formatted = data?.map(scan => ({
         id: scan.id,
-        youthName: `${scan.youth?.first_name || ''} ${scan.youth?.last_name || ''}`.trim(),
-        programName: scan.program?.program_name,
+        youthName: scan.youth ? `${scan.youth.first_name || ''} ${scan.youth.last_name || ''}`.trim() : "Unknown",
+        serviceType: scan.service_type || "attendance",
+        status: scan.transaction_status,
         time: format(new Date(scan.created_at), "hh:mm a"),
-        method: scan.method,
-        status: scan.status
+        date: format(new Date(scan.created_at), "MMM dd")
       })) || [];
 
       setRecentScans(formatted);
@@ -197,25 +207,30 @@ export default function SKKagawadDashboard() {
       await Promise.all([
         fetchStats(),
         fetchOngoingPrograms(),
-        fetchRecentScans()
+        fetchRecentScans(),
+        fetchWeeklyData()
       ]);
       setIsLoading(false);
     };
     
-    loadDashboard();
-  }, []);
+    if (isAuthorized) {
+      loadDashboard();
+    }
+  }, [isAuthorized]);
 
   // Status badge helper
   const getStatusBadge = (status) => {
     switch(status?.toLowerCase()) {
+      case 'completed':
+        return <span className="status-badge completed"><FaCheckCircle /> Completed</span>;
       case 'approved':
         return <span className="status-badge approved"><FaCheckCircle /> Approved</span>;
       case 'pending':
         return <span className="status-badge pending"><FaHourglassHalf /> Pending</span>;
-      case 'ineligible':
-        return <span className="status-badge ineligible"><FaTimesCircle /> Ineligible</span>;
+      case 'rejected':
+        return <span className="status-badge rejected"><FaTimesCircle /> Rejected</span>;
       default:
-        return <span className="status-badge default">{status}</span>;
+        return <span className="status-badge default">{status || "Pending"}</span>;
     }
   };
 
@@ -225,16 +240,15 @@ export default function SKKagawadDashboard() {
     { name: "Scan QR", icon: FaQrcode, path: "/scan" },
     { name: "Create Program", icon: FaPlusCircle, path: "/create-programs" },
     { name: "View Programs", icon: FaList, path: "/view-programs" },
-    { name: "Transactions", icon: FaExchangeAlt, path: "/transactions" },
+    { name: "Transactions", icon: FaExchangeAlt, path: "/transaction" },
     { name: "Generate Report", icon: FaChartLine, path: "/generate-reports" },
   ];
 
-  // Quick actions with icons
   const quickActions = [
     { name: "Scan QR", icon: FaQrcode, path: "/scan", color: "#10B981" },
     { name: "Create Program", icon: FaPlusCircle, path: "/create-programs", color: "#F59E0B" },
     { name: "View Programs", icon: FaList, path: "/view-programs", color: "#8B5CF6" },
-    { name: "Transactions", icon: FaExchangeAlt, path: "/transactions", color: "#EF4444" },
+    { name: "Transactions", icon: FaExchangeAlt, path: "/transaction", color: "#EF4444" },
     { name: "Generate Report", icon: FaChartLine, path: "/generate-reports", color: "#EC4899" },
   ];
 
@@ -247,6 +261,9 @@ export default function SKKagawadDashboard() {
       </div>
     );
   }
+
+  const maxValue = Math.max(...weeklyData, 1);
+  const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
   return (
     <>
@@ -312,6 +329,26 @@ export default function SKKagawadDashboard() {
             </div>
           </div>
 
+          {/* Weekly Chart */}
+          <div className="weekly-chart">
+            <h3>Weekly Transactions</h3>
+            <div className="chart-bars">
+              {weeklyData.map((value, index) => (
+                <div key={index} className="chart-bar-container">
+                  <div 
+                    className="chart-bar" 
+                    style={{ 
+                      height: `${(value / maxValue) * 100}%`,
+                      backgroundColor: "#f2b705"
+                    }}
+                  ></div>
+                  <span className="chart-value">{value}</span>
+                  <span className="chart-label">{days[index]}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
           {/* Quick Actions */}
           <div className="quick-actions-section">
             <h3>Quick Actions</h3>
@@ -349,15 +386,14 @@ export default function SKKagawadDashboard() {
                     ongoingPrograms.map((program, index) => (
                       <div key={index} className="info-item">
                         <div className="info-details">
-                          <span className="info-name">{program.youthName || "Unknown"}</span>
-                          <span className="info-program">{program.programName || "-"}</span>
+                          <span className="info-name">{program.program_name}</span>
                           <span className="info-time">
-                            <FaClock className="inline-icon" /> {program.time}
+                            <FaCalendarAlt className="inline-icon" /> 
+                            {program.start_date}
                           </span>
                         </div>
                         <div className="info-meta">
-                          <span className="badge-method">{program.method}</span>
-                          {getStatusBadge(program.status)}
+                          {getStatusBadge(program.program_status)}
                         </div>
                       </div>
                     ))
@@ -369,28 +405,25 @@ export default function SKKagawadDashboard() {
 
               {/* Recent QR Scans Card */}
               <div className="info-card">
-                <h3><FaQrcode className="card-icon" /> Recent QR Scans</h3>
+                <h3><FaQrcode className="card-icon" /> Recent Transactions</h3>
                 <div className="info-list">
                   {recentScans.length > 0 ? (
                     recentScans.map((scan, index) => (
                       <div key={index} className="info-item">
                         <div className="info-details">
-                          <span className="info-name">{scan.youthName || "Unknown"}</span>
-                          <span className="info-program">{scan.programName || "-"}</span>
+                          <span className="info-name">{scan.youthName}</span>
+                          <span className="info-type">{scan.serviceType}</span>
                           <span className="info-time">
                             <FaClock className="inline-icon" /> {scan.time}
                           </span>
                         </div>
                         <div className="info-meta">
-                          <span className="badge-method">
-                            <FaQrcode className="inline-icon" /> {scan.method}
-                          </span>
                           {getStatusBadge(scan.status)}
                         </div>
                       </div>
                     ))
                   ) : (
-                    <p className="empty-state">No recent QR scans</p>
+                    <p className="empty-state">No recent transactions</p>
                   )}
                 </div>
               </div>

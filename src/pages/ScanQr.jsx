@@ -4,14 +4,21 @@ import Navbar from "../components/Navbar";
 import { supabase } from "../services/supabaseClient";
 import { Html5Qrcode } from "html5-qrcode";
 import jsQR from "jsqr";
-import { FaQrcode, FaCheckCircle, FaTimesCircle, FaUser, FaClipboardList, FaPrint, FaTools, FaHistory, FaUpload, FaCamera, FaArrowLeft } from "react-icons/fa";
+import { 
+  FaQrcode, FaCheckCircle, FaTimesCircle, FaUser, 
+  FaClipboardList, FaPrint, FaTools, FaHistory, 
+  FaUpload, FaCamera, FaArrowLeft, FaSpinner,
+  FaStop, FaUsers
+} from "react-icons/fa";
 import { format } from "date-fns";
 import "../styles/scanQR.css";
 
 export default function ScanQRPage() {
   const navigate = useNavigate();
+  
+  // State
   const [isAuthorized, setIsAuthorized] = useState(false);
-  const [mode, setMode] = useState(null); // "scan" or "upload"
+  const [mode, setMode] = useState(null);
   const [scanning, setScanning] = useState(false);
   const [userInfo, setUserInfo] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -23,20 +30,28 @@ export default function ScanQRPage() {
   const [recentScans, setRecentScans] = useState([]);
   const [hasScanned, setHasScanned] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [showManualRequestModal, setShowManualRequestModal] = useState(false);
+  const [manualRequestReason, setManualRequestReason] = useState("");
+  const [requestType, setRequestType] = useState("");
+  const [currentUser, setCurrentUser] = useState(null);
+  const [youthList, setYouthList] = useState([]);
+  const [selectedYouthId, setSelectedYouthId] = useState("");
+  const [searchYouth, setSearchYouth] = useState("");
   
   const html5QrCodeRef = useRef(null);
   const isProcessingRef = useRef(false);
 
-  // ========== ROLE PROTECTION ==========
+  // Auth check
   useEffect(() => {
     const checkAccess = async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser();
-        
         if (!user) {
           navigate("/");
           return;
         }
+
+        setCurrentUser(user);
 
         const { data: userData, error } = await supabase
           .from("users")
@@ -44,19 +59,16 @@ export default function ScanQRPage() {
           .eq("user_id", user.id)
           .single();
 
-        if (error || !userData) {
-          navigate("/");
-          return;
-        }
-
-        if (userData.role_id !== 1 && userData.role_id !== 2) {
+        if (error || !userData || (userData.role_id !== 1 && userData.role_id !== 2)) {
           navigate("/");
           return;
         }
 
         setIsAuthorized(true);
+        fetchRecentScans();
+        fetchYouthList();
       } catch (error) {
-        console.error("Auth check error:", error);
+        console.error("Auth error:", error);
         navigate("/");
       }
     };
@@ -64,7 +76,22 @@ export default function ScanQRPage() {
     checkAccess();
   }, [navigate]);
 
-  // ========== FETCH RECENT SCANS ==========
+  // Fetch youth list
+  const fetchYouthList = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("youth")
+        .select("id, first_name, last_name, barangay")
+        .order("first_name", { ascending: true });
+
+      if (error) throw error;
+      setYouthList(data || []);
+    } catch (error) {
+      console.error("Error fetching youth:", error);
+    }
+  };
+
+  // Fetch recent scans
   const fetchRecentScans = async () => {
     try {
       const { data, error } = await supabase
@@ -93,15 +120,14 @@ export default function ScanQRPage() {
 
       setRecentScans(formatted);
     } catch (error) {
-      console.error("Error fetching recent scans:", error);
+      console.error("Error fetching scans:", error);
     }
   };
 
-  // ========== CHECK DUPLICATE ATTENDANCE ==========
+  // Check duplicate attendance
   const checkDuplicate = async (userId) => {
     try {
       const today = new Date().toISOString().split('T')[0];
-      
       const { data, error } = await supabase
         .from("attendance")
         .select("id")
@@ -110,7 +136,6 @@ export default function ScanQRPage() {
         .maybeSingle();
 
       if (error && error.code !== "PGRST116") throw error;
-      
       return !!data;
     } catch (error) {
       console.error("Error checking duplicate:", error);
@@ -118,7 +143,7 @@ export default function ScanQRPage() {
     }
   };
 
-  // ========== CALCULATE ACCURATE AGE ==========
+  // Calculate age
   const calculateAge = (birthdate) => {
     if (!birthdate) return null;
     const today = new Date();
@@ -129,7 +154,81 @@ export default function ScanQRPage() {
     return age;
   };
 
-  // ========== PROCESS QR CODE ==========
+  // ========== SEND MANUAL REQUEST - FIXED (removed requires_verification) ==========
+  const sendManualRequest = async () => {
+    // Validate required fields
+    if (!manualRequestReason || !requestType || !selectedYouthId) {
+      setErrorMessage("Please complete all fields");
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      // ✅ 1. ALWAYS insert transaction (main record - removed requires_verification)
+      const { data: newTransaction, error: tError } = await supabase
+        .from("transaction")
+        .insert([{
+          youth_id: parseInt(selectedYouthId),
+          type: "Manual Verification",
+          service_type: requestType,
+          remarks: manualRequestReason,
+          transaction_status: "Pending",
+          created_at: new Date().toISOString()
+        }])
+        .select()
+        .single();
+
+      if (tError) throw tError;
+
+      // ✅ 2. OPTIONAL notification (won't break system if fails)
+      try {
+        const { data: chairman } = await supabase
+          .from("users")
+          .select("user_id")
+          .eq("role_id", 1)
+          .maybeSingle();
+
+        if (chairman?.user_id) {
+          await supabase.from("notifications").insert([{
+            sender_id: currentUser?.id,
+            receiver_id: chairman.user_id,
+            transaction_id: newTransaction.id,
+            message: `Manual verification request: ${manualRequestReason}`,
+            type: "manual_verification",
+            request_type: requestType,
+            status: "pending",
+            is_read: false,
+            created_at: new Date().toISOString()
+          }]);
+          console.log("✅ Notification sent to chairman");
+        } else {
+          console.log("⚠️ Chairman not found, notification skipped");
+        }
+      } catch (notifErr) {
+        // Notification failed but transaction saved - system still works
+        console.log("⚠️ Notification skipped (safe):", notifErr.message);
+      }
+
+      // ✅ SUCCESS UI
+      setSuccessMessage("Manual verification request submitted!");
+      setShowManualRequestModal(false);
+      setManualRequestReason("");
+      setRequestType("");
+      setSelectedYouthId("");
+      setSearchYouth("");
+      
+      setTimeout(() => setSuccessMessage(""), 3000);
+
+    } catch (error) {
+      console.error("Manual request error:", error);
+      setErrorMessage("Request failed: " + (error.message || "Please try again"));
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Process QR code
   const processQRCode = async (qrData) => {
     if (hasScanned || isProcessingRef.current) return;
     
@@ -142,45 +241,28 @@ export default function ScanQRPage() {
       
       if (!qrData || typeof qrData !== "string") {
         setErrorMessage("Invalid QR format");
-        setHasScanned(false);
-        isProcessingRef.current = false;
-        setIsLoading(false);
         return;
       }
       
-      console.log("SCANNED QR:", qrData);
-      
-      // Extract QR code value - handle JSON or plain text
+      // SAFE QR parsing
       let qrCodeValue = qrData;
       try {
         const parsed = JSON.parse(qrData);
         qrCodeValue = parsed.qr_code || parsed.youth_id || parsed.id || qrData;
       } catch {
-        // Not JSON, use as is
+        qrCodeValue = qrData.trim();
       }
 
-      console.log("QR CODE VALUE:", qrCodeValue);
+      console.log("📱 Scanned QR value:", qrCodeValue);
 
       const { data: youth, error } = await supabase
         .from("youth")
-        .select(`
-          id,
-          first_name,
-          last_name,
-          birthdate,
-          barangay,
-          status,
-          qr_code
-        `)
+        .select(`id, first_name, last_name, birthdate, barangay, status, qr_code`)
         .eq("qr_code", qrCodeValue)
         .single();
 
       if (error || !youth) {
-        console.error("Youth not found:", error);
         setErrorMessage("User not found. Invalid QR code.");
-        setHasScanned(false);
-        isProcessingRef.current = false;
-        setIsLoading(false);
         return;
       }
 
@@ -195,31 +277,30 @@ export default function ScanQRPage() {
         qr_code: youth.qr_code
       });
 
-      // Stop scanner if it's running
       if (html5QrCodeRef.current) {
         try {
           await html5QrCodeRef.current.stop();
-        // eslint-disable-next-line no-unused-vars
-        } catch (e) {
-          console.log("Scanner already stopped");
+          await html5QrCodeRef.current.clear();
+          html5QrCodeRef.current = null;
+        } catch  {
+          console.log("Scanner stopped");
         }
       }
-      
       setScanning(false);
       
     } catch (error) {
       console.error("Error processing QR:", error);
-      setErrorMessage("Error processing QR code. Please try again.");
-      setHasScanned(false);
-      isProcessingRef.current = false;
+      setErrorMessage("Error processing QR");
     } finally {
       setIsLoading(false);
+      setHasScanned(false);
+      isProcessingRef.current = false;
     }
   };
 
-  // ========== HANDLE QR IMAGE UPLOAD ==========
+  // Handle file upload
   const handleFileUpload = async (event) => {
-    const file = event.target.files[0];
+    const file = event.target.files?.[0];
     if (!file) return;
 
     setUploading(true);
@@ -235,6 +316,11 @@ export default function ScanQRPage() {
     img.onload = () => {
       const canvas = document.createElement("canvas");
       const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        setErrorMessage("Failed to process image");
+        setUploading(false);
+        return;
+      }
 
       canvas.width = img.width;
       canvas.height = img.height;
@@ -244,10 +330,9 @@ export default function ScanQRPage() {
       const code = jsQR(imageData.data, canvas.width, canvas.height);
 
       if (code) {
-        console.log("✅ UPLOADED QR:", code.data);
         processQRCode(code.data);
       } else {
-        setErrorMessage("No QR code found in image. Please try a different image.");
+        setErrorMessage("No QR code found");
       }
       
       setUploading(false);
@@ -255,7 +340,7 @@ export default function ScanQRPage() {
     };
 
     img.onerror = () => {
-      setErrorMessage("Failed to load image. Please try again.");
+      setErrorMessage("Failed to load image");
       setUploading(false);
       event.target.value = "";
     };
@@ -263,92 +348,104 @@ export default function ScanQRPage() {
     reader.readAsDataURL(file);
   };
 
-  // ========== INITIALIZE SCANNER - Only when mode is "scan" ==========
-  useEffect(() => {
+  // ========== SCANNER CONTROLS ==========
+  const startScanner = async () => {
     if (!isAuthorized || mode !== "scan" || scanning || html5QrCodeRef.current) return;
 
-    const startScanner = async () => {
-      try {
-        html5QrCodeRef.current = new Html5Qrcode("qr-reader");
-        
-        const config = {
-          fps: 10,
-          qrbox: { width: 250, height: 250 },
-          aspectRatio: 1.0,
-        };
+    try {
+      // Check if camera is available
+      const devices = await Html5Qrcode.getCameras();
+      if (!devices || devices.length === 0) {
+        setErrorMessage("No camera found on this device");
+        setMode(null);
+        return;
+      }
 
-        await html5QrCodeRef.current.start(
-          { facingMode: "user" },
-          config,
-          (decodedText) => {
-            console.log("✅ SCANNED:", decodedText);
+      html5QrCodeRef.current = new Html5Qrcode("qr-reader");
+      
+      // Improved config for better detection
+      const config = {
+        fps: 15,
+        qrbox: { width: 300, height: 300 },
+        aspectRatio: 1.0,
+      };
+
+      await html5QrCodeRef.current.start(
+        { facingMode: "environment" },
+        config,
+        (decodedText) => {
+          console.log("✅ SCANNED:", decodedText);
+          if (!isProcessingRef.current) {
             processQRCode(decodedText);
-          },
-          (error) => {
+          }
+        },
+        (error) => {
+          if (error && !error.includes("No MultiFormat Readers")) {
             console.log("Scan error:", error);
           }
-        );
-        setScanning(true);
-        console.log("Scanner started successfully");
-      } catch (error) {
-        console.error("Error starting scanner:", error);
-        setErrorMessage("Failed to start camera. Please check permissions or use the upload option.");
-        setMode(null);
-      }
-    };
-
-    startScanner();
-
-    return () => {
-      const stopScanner = async () => {
-        if (html5QrCodeRef.current) {
-          try {
-            await html5QrCodeRef.current.stop();
-            await html5QrCodeRef.current.clear();
-            html5QrCodeRef.current = null;
-          } catch (error) {
-            console.log("Error stopping scanner:", error);
-          }
         }
-      };
-      stopScanner();
-      setScanning(false);
-    };
-  }, [isAuthorized, mode, scanning]);
+      );
+      setScanning(true);
+    } catch (error) {
+      console.error("Error starting scanner:", error);
+      setErrorMessage("Failed to start camera. Please check permissions and use HTTPS.");
+      setMode(null);
+    }
+  };
 
-  // ========== RESET SCANNER ==========
-  const resetToModeSelection = () => {
-    // Stop scanner if running
-    const stopScanner = async () => {
-      if (html5QrCodeRef.current) {
-        try {
-          await html5QrCodeRef.current.stop();
-          await html5QrCodeRef.current.clear();
-        } catch (e) {
-          console.log("Error stopping scanner:", e);
-        }
+  const stopScanner = async () => {
+    if (html5QrCodeRef.current) {
+      try {
+        await html5QrCodeRef.current.stop();
+        await html5QrCodeRef.current.clear();
         html5QrCodeRef.current = null;
+      } catch (error) {
+        console.log("Error stopping scanner:", error);
+      }
+    }
+    setScanning(false);
+  };
+
+  const cancelScanning = async () => {
+    await stopScanner();
+    setMode(null);
+    setErrorMessage("");
+  };
+
+  // Initialize scanner with delay
+  useEffect(() => {
+    if (mode === "scan") {
+      const timer = setTimeout(() => {
+        startScanner();
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+    return () => {
+      if (mode === "scan") {
+        stopScanner();
       }
     };
-    stopScanner();
+  }, [mode, isAuthorized]);
 
+  // Reset
+  const resetToModeSelection = async () => {
+    await stopScanner();
     setUserInfo(null);
     setSelectedAction(null);
     setShowConfirmModal(false);
     setErrorMessage("");
     setHasScanned(false);
     isProcessingRef.current = false;
-    setScanning(false);
     setMode(null);
   };
 
-  // ========== HANDLE ACTION SELECTION ==========
+  // Handle action selection
   const handleActionSelect = (action) => {
     setSelectedAction(action);
     setShowConfirmModal(true);
   };
 
-  // ========== CONFIRM TRANSACTION ==========
+  // Confirm transaction
   const confirmTransaction = async () => {
     if (!userInfo || !selectedAction) return;
 
@@ -358,29 +455,31 @@ export default function ScanQRPage() {
     try {
       const isDuplicate = await checkDuplicate(userInfo.id);
       if (isDuplicate) {
-        setErrorMessage(`${userInfo.name} has already recorded attendance today.`);
+        setErrorMessage(`${userInfo.name} already recorded attendance today`);
         setIsLoading(false);
         return;
       }
 
       const { data: { user } } = await supabase.auth.getUser();
-      
       const { data: userData } = await supabase
         .from("users")
-        .select("first_name, last_name, role_id")
-        .eq("user_id", user.id)
+        .select("first_name, last_name")
+        .eq("user_id", user?.id)
         .single();
 
       const verifiedBy = userData ? `${userData.first_name} ${userData.last_name}` : "System";
 
       const { error: insertError } = await supabase
-        .from("attendance")
-        .insert({
+        .from("transaction")
+        .insert([{
           youth_id: userInfo.id,
-          method: "qr",
-          verified_by: verifiedBy,
-          notes: `QR scan - ${selectedAction} transaction`
-        });
+          type: "Service",
+          service_type: selectedAction === "borrow" ? "borrow" : selectedAction === "printing" ? "print" : "attendance",
+          transaction_status: "Completed",
+          remarks: `QR scan - ${selectedAction}`,
+          created_at: new Date().toISOString(),
+          verified_by: verifiedBy
+        }]);
 
       if (insertError) throw insertError;
 
@@ -393,7 +492,7 @@ export default function ScanQRPage() {
           actionMessage = "Equipment Borrowed";
           break;
         case "printing":
-          actionMessage = "Printing Transaction Completed";
+          actionMessage = "Printing Completed";
           break;
         default:
           actionMessage = "Transaction Completed";
@@ -411,32 +510,29 @@ export default function ScanQRPage() {
       
     } catch (error) {
       console.error("Error saving transaction:", error);
-      setErrorMessage("Failed to save transaction. Please try again.");
+      setErrorMessage("Failed to save transaction");
     } finally {
       setIsLoading(false);
       setShowConfirmModal(false);
     }
   };
 
-  // ========== CANCEL TRANSACTION ==========
   const cancelTransaction = () => {
     setShowConfirmModal(false);
     setSelectedAction(null);
   };
 
-  // ========== LOAD RECENT SCANS ON MOUNT ==========
-  useEffect(() => {
-    if (isAuthorized) {
-      fetchRecentScans();
-    }
-  }, [isAuthorized]);
+  // Filter youth list
+  const filteredYouth = youthList.filter(youth => 
+    `${youth.first_name} ${youth.last_name}`.toLowerCase().includes(searchYouth.toLowerCase()) ||
+    youth.barangay?.toLowerCase().includes(searchYouth.toLowerCase())
+  );
 
-  // Show loading while checking authorization
   if (!isAuthorized) {
     return (
       <div className="loading-container">
-        <div className="spinner"></div>
-        <p>Verifying access...</p>
+        <FaSpinner className="spinner" />
+        <p>Loading...</p>
       </div>
     );
   }
@@ -446,10 +542,10 @@ export default function ScanQRPage() {
       <Navbar />
       <div className="scan-qr-page">
         <div className="scan-container">
-          {/* Header with Back Button - Matching other pages */}
+          {/* Header */}
           <div className="page-header">
             <button className="back-btn" onClick={() => navigate(-1)}>
-              <FaArrowLeft /> Back
+              <FaArrowLeft />
             </button>
             <div className="header-text">
               <h2>QR Code Scanner</h2>
@@ -457,7 +553,7 @@ export default function ScanQRPage() {
             </div>
           </div>
 
-          {/* Success Toast */}
+          {/* Success/Error Messages */}
           {showSuccess && (
             <div className="success-toast">
               <FaCheckCircle className="success-icon" />
@@ -468,7 +564,6 @@ export default function ScanQRPage() {
             </div>
           )}
 
-          {/* Error Message */}
           {errorMessage && (
             <div className="error-message">
               <FaTimesCircle className="error-icon" />
@@ -478,9 +573,9 @@ export default function ScanQRPage() {
           )}
 
           <div className="scan-content">
-            {/* Left Column - Scanner/Upload Area */}
+            {/* Left Column */}
             <div className="scanner-column">
-              {/* Mode Selection - Shown first */}
+              {/* Mode Selection */}
               {!mode && (
                 <div className="mode-selection">
                   <h3>Choose Method</h3>
@@ -496,22 +591,37 @@ export default function ScanQRPage() {
                       <small>Upload a screenshot or photo of QR</small>
                     </button>
                   </div>
+                  <button onClick={() => setShowManualRequestModal(true)} className="manual-request-btn">
+                    Manual Verification Request
+                  </button>
                 </div>
               )}
 
               {/* Scan Mode */}
-              {mode === "scan" && (
+              {mode === "scan" && !userInfo && (
                 <>
                   <div className="scanner-wrapper">
                     <div id="qr-reader" className="qr-reader"></div>
                     <div className="scan-overlay">
                       <div className="scan-frame"></div>
                       <p>Position QR code within the frame</p>
+                      <small className="scan-hint">Move closer and ensure good lighting</small>
                     </div>
                   </div>
-                  <button onClick={resetToModeSelection} className="change-mode-btn">
-                    ← Change Mode
-                  </button>
+                  {isLoading && (
+                    <div className="scanning-status">
+                      <FaSpinner className="spinner-small" />
+                      <p>Processing...</p>
+                    </div>
+                  )}
+                  <div className="scanner-buttons">
+                    <button onClick={cancelScanning} className="cancel-scan-btn">
+                      <FaStop /> Cancel Scanning
+                    </button>
+                    <button onClick={resetToModeSelection} className="change-mode-btn">
+                      ← Change Mode
+                    </button>
+                  </div>
                 </>
               )}
 
@@ -525,18 +635,12 @@ export default function ScanQRPage() {
                   <p>Select an image file containing a QR code</p>
                   <label className="upload-btn">
                     <FaUpload /> Choose Image
-                    <input 
-                      type="file" 
-                      accept="image/*" 
-                      onChange={handleFileUpload} 
-                      hidden 
-                      disabled={uploading}
-                    />
+                    <input type="file" accept="image/*" onChange={handleFileUpload} hidden disabled={uploading} />
                   </label>
                   {uploading && (
                     <div className="uploading-status">
-                      <div className="spinner-small"></div>
-                      <p>Processing image...</p>
+                      <FaSpinner className="spinner-small" />
+                      <p>Processing...</p>
                     </div>
                   )}
                   <button onClick={resetToModeSelection} className="change-mode-btn">
@@ -545,7 +649,7 @@ export default function ScanQRPage() {
                 </div>
               )}
 
-              {/* User Info after successful scan/upload */}
+              {/* User Info Card */}
               {userInfo && (
                 <div className="user-info-card">
                   <h3>Youth Information</h3>
@@ -580,24 +684,15 @@ export default function ScanQRPage() {
                   <div className="action-buttons">
                     <h4>Select Transaction Type:</h4>
                     <div className="action-grid">
-                      <button 
-                        onClick={() => handleActionSelect("attendance")}
-                        className="action-option attendance"
-                      >
+                      <button onClick={() => handleActionSelect("attendance")} className="action-option attendance">
                         <FaClipboardList />
                         <span>Seminar Attendance</span>
                       </button>
-                      <button 
-                        onClick={() => handleActionSelect("borrow")}
-                        className="action-option borrow"
-                      >
+                      <button onClick={() => handleActionSelect("borrow")} className="action-option borrow">
                         <FaTools />
                         <span>Equipment Borrowing</span>
                       </button>
-                      <button 
-                        onClick={() => handleActionSelect("printing")}
-                        className="action-option printing"
-                      >
+                      <button onClick={() => handleActionSelect("printing")} className="action-option printing">
                         <FaPrint />
                         <span>Printing Transaction</span>
                       </button>
@@ -612,13 +707,10 @@ export default function ScanQRPage() {
               )}
             </div>
 
-            {/* Right Column - Recent Scans History */}
+            {/* Right Column - Recent */}
             <div className="history-column">
               <div className="recent-scans-card">
-                <h3>
-                  <FaHistory className="history-icon" />
-                  Recent Transactions
-                </h3>
+                <h3><FaHistory className="history-icon" /> Recent Transactions</h3>
                 <div className="scans-list">
                   {recentScans.length > 0 ? (
                     recentScans.map((scan) => (
@@ -665,16 +757,90 @@ export default function ScanQRPage() {
                     {selectedAction === "printing" && "Printing Transaction"}
                   </span>
                 </div>
-                <p className="confirm-warning">
-                  This action will be recorded and cannot be undone.
+                <p className="confirm-warning">This action will be recorded and cannot be undone.</p>
+              </div>
+              <div className="modal-footer">
+                <button onClick={cancelTransaction} className="cancel-confirm-btn">Cancel</button>
+                <button onClick={confirmTransaction} className="confirm-btn" disabled={isLoading}>
+                  {isLoading ? <FaSpinner className="spinner-small" /> : "Confirm"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Manual Verification Modal */}
+        {showManualRequestModal && (
+          <div className="modal-overlay">
+            <div className="modal-content large">
+              <div className="modal-header">
+                <h3>Manual Verification Request</h3>
+                <button className="close-btn" onClick={() => setShowManualRequestModal(false)}>&times;</button>
+              </div>
+              <div className="modal-body">
+                {/* Youth Selection */}
+                <div className="form-group">
+                  <label><FaUsers /> Select Youth *</label>
+                  <input
+                    type="text"
+                    placeholder="Search youth by name or barangay..."
+                    value={searchYouth}
+                    onChange={(e) => setSearchYouth(e.target.value)}
+                    className="search-youth-input"
+                  />
+                  <div className="youth-list-dropdown">
+                    {filteredYouth.length > 0 ? (
+                      filteredYouth.map(youth => (
+                        <div
+                          key={youth.id}
+                          className={`youth-item ${selectedYouthId === youth.id.toString() ? 'selected' : ''}`}
+                          onClick={() => setSelectedYouthId(youth.id.toString())}
+                        >
+                          <strong>{youth.first_name} {youth.last_name}</strong>
+                          <span>{youth.barangay}</span>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="no-results">No youth found</p>
+                    )}
+                  </div>
+                  {selectedYouthId && (
+                    <div className="selected-youth">
+                      Selected: {youthList.find(y => y.id.toString() === selectedYouthId)?.first_name} {youthList.find(y => y.id.toString() === selectedYouthId)?.last_name}
+                    </div>
+                  )}
+                </div>
+
+                {/* Request Type */}
+                <div className="form-group">
+                  <label>Request Type *</label>
+                  <select value={requestType} onChange={(e) => setRequestType(e.target.value)} className="form-select">
+                    <option value="">Select request type</option>
+                    <option value="attendance">Attendance Verification</option>
+                    <option value="borrow">Equipment Borrowing</option>
+                    <option value="printing">Printing Service</option>
+                  </select>
+                </div>
+
+                {/* Reason */}
+                <div className="form-group">
+                  <label>Reason / Details *</label>
+                  <textarea
+                    rows="4"
+                    placeholder="Please provide details for your request..."
+                    value={manualRequestReason}
+                    onChange={(e) => setManualRequestReason(e.target.value)}
+                  />
+                </div>
+
+                <p className="request-info">
+                  This request will be sent to the SK Chairman for review and approval.
                 </p>
               </div>
               <div className="modal-footer">
-                <button onClick={cancelTransaction} className="cancel-confirm-btn">
-                  Cancel
-                </button>
-                <button onClick={confirmTransaction} className="confirm-btn" disabled={isLoading}>
-                  {isLoading ? "Processing..." : "Confirm"}
+                <button onClick={() => setShowManualRequestModal(false)}>Cancel</button>
+                <button onClick={sendManualRequest} disabled={isLoading}>
+                  {isLoading ? <FaSpinner className="spinner-small" /> : "Send Request"}
                 </button>
               </div>
             </div>

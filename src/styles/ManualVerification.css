@@ -17,7 +17,7 @@
   box-shadow: var(--shadow-sm);
 }
 
-.manual-verification-container .back-btn {
+.manual-verification-container .back-button {
   padding: 8px 16px;
   background: #f1f5f9;
   border: none;
@@ -31,7 +31,7 @@
   transition: all 0.2s ease;
 }
 
-.manual-verification-container .back-btn:hover {
+.manual-verification-container .back-button:hover {
   background: #e2e8f0;
   transform: translateX(-2px);
 }

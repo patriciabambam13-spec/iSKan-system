@@ -45,50 +45,65 @@ export default function SKChairmanDashboard() {
   const [recentOverrides, setRecentOverrides] = useState([]);
   const [activePrograms, setActivePrograms] = useState([]);
 
-  // Fetch stats
+  // ========== FETCH STATS ==========
   const fetchStats = async () => {
     try {
+      // Total Youth
       const { count: youthCount } = await supabase
         .from("youth")
         .select("*", { count: "exact", head: true });
 
+      // Active Programs - using program_status
       const { count: programCount } = await supabase
         .from("programs")
-        .select("*", { count: "exact", head: true });
+        .select("*", { count: "exact", head: true })
+        .eq("program_status", "ongoing");
 
+      // Transactions Today - using 'transaction' table
       const today = new Date().toISOString().split('T')[0];
-      const { count: overrideCount } = await supabase
-        .from("overrides")
+      const { count: transactionCount } = await supabase
+        .from("transaction")
         .select("*", { count: "exact", head: true })
         .gte("created_at", today);
 
-      const { data: beneficiaries } = await supabase
-        .from("transactions")
-        .select("youth_id")
-        .gte("created_at", startOfMonth(new Date()).toISOString());
+      // Manual Verifications Today - using 'transaction' table
+      const { count: overrideCount } = await supabase
+        .from("transaction")
+        .select("*", { count: "exact", head: true })
+        .eq("type", "Manual Verification")
+        .gte("created_at", today);
 
-      const uniqueBeneficiaries = new Set(beneficiaries?.map(b => b.youth_id) || []);
+      // Beneficiaries This Month
+      const { data: beneficiaries } = await supabase
+        .from("transaction")
+        .select("youth_id")
+        .gte("created_at", startOfMonth(new Date()).toISOString())
+        .eq("transaction_status", "Completed");
+
+      const uniqueBeneficiaries = new Set(beneficiaries?.map(b => b.youth_id).filter(id => id) || []);
 
       setStats({
         youth: youthCount || 0,
         programs: programCount || 0,
-        transactions: 35,
+        transactions: transactionCount || 0,
         overrides: overrideCount || 0,
         beneficiaries: uniqueBeneficiaries.size
       });
 
     } catch (error) {
-      console.error("Dashboard fetch error:", error);
+      console.error("Stats error:", error);
     }
   };
 
-  // Fetch chart data
+  // ========== FETCH CHART DATA ==========
   const fetchChartData = async () => {
     try {
+      // 1. Registration Trend - from youth table
       const { data: registrations } = await supabase
         .from("youth")
         .select("created_at")
-        .gte("created_at", subDays(new Date(), 180).toISOString());
+        .gte("created_at", subDays(new Date(), 180).toISOString())
+        .order("created_at", { ascending: true });
 
       const monthlyReg = {};
       registrations?.forEach(reg => {
@@ -101,6 +116,7 @@ export default function SKChairmanDashboard() {
         .filter(m => monthlyReg[m])
         .map(m => ({ month: m, count: monthlyReg[m] }));
 
+      // 2. Gender Distribution - from youth table
       const { data: genderData } = await supabase
         .from("youth")
         .select("gender");
@@ -118,27 +134,32 @@ export default function SKChairmanDashboard() {
         { name: "Other", value: genderDist.Other }
       ].filter(g => g.value > 0);
 
-      const { data: youthPrograms } = await supabase
-        .from("youth")
-        .select("program_id, programs(program_name)");
+      // 3. Program Participation - FIXED: using transaction table
+      const { data: programTransactions } = await supabase
+        .from("transaction")
+        .select("program_id, programs:program_id(program_name)")
+        .not("program_id", "is", null);
 
       const programDist = {};
-      youthPrograms?.forEach(y => {
-        if (y.program_id) {
-          const progName = y.programs?.program_name || "Unknown";
+      programTransactions?.forEach(t => {
+        if (t.program_id) {
+          const progName = t.programs?.program_name || "Unknown Program";
           programDist[progName] = (programDist[progName] || 0) + 1;
         }
       });
 
       const programDistribution = Object.entries(programDist)
-        .map(([name, value]) => ({ name, value }))
+        .map(([name, value]) => ({ name: name.length > 15 ? name.substring(0, 15) + "..." : name, value }))
         .sort((a, b) => b.value - a.value)
         .slice(0, 5);
 
+      // 4. Monthly Overrides - FIXED: using transaction table
       const { data: overrides } = await supabase
-        .from("overrides")
+        .from("transaction")
         .select("created_at")
-        .gte("created_at", subDays(new Date(), 90).toISOString());
+        .eq("type", "Manual Verification")
+        .gte("created_at", subDays(new Date(), 90).toISOString())
+        .order("created_at", { ascending: true });
 
       const monthlyOver = {};
       overrides?.forEach(ov => {
@@ -158,41 +179,47 @@ export default function SKChairmanDashboard() {
       });
 
     } catch (error) {
-      console.error("Error fetching chart data:", error);
+      console.error("Chart data error:", error);
     }
   };
 
-  // Fetch recent overrides
+  // ========== FETCH RECENT OVERRIDES ==========
   const fetchRecentOverrides = async () => {
     try {
       const { data } = await supabase
-        .from("overrides")
+        .from("transaction")
         .select(`
-          *,
-          youth:youth_id(first_name, last_name),
-          programs:program_id(program_name)
+          id,
+          youth_id,
+          type,
+          remarks,
+          created_at,
+          transaction_status,
+          youth:youth_id(first_name, last_name)
         `)
+        .eq("type", "Manual Verification")
         .order("created_at", { ascending: false })
         .limit(5);
 
       setRecentOverrides(data || []);
     } catch (error) {
-      console.error("Error fetching overrides:", error);
+      console.error("Recent overrides error:", error);
     }
   };
 
-  // Fetch active programs
+  // ========== FETCH ACTIVE PROGRAMS ==========
   const fetchActivePrograms = async () => {
     try {
       const { data } = await supabase
         .from("programs")
         .select("*")
-        .eq("status", "Active")
+        .eq("program_status", "ongoing")
+        .order("start_date", { ascending: true })
         .limit(5);
 
       setActivePrograms(data || []);
     } catch (error) {
-      console.error("Error fetching programs:", error);
+      console.error("Active programs error:", error);
     }
   };
 
@@ -219,7 +246,7 @@ export default function SKChairmanDashboard() {
     { name: "Manage Program", icon: FaPlusCircle, path: "/manage-programs" },
     { name: "Generate Reports", icon: FaChartLine, path: "/generate-reports" },
     { name: "Audit Logs", icon: FaHistory, path: "/audit-logs" },
-    { name: "Manual Verification Youth", icon: FaExclamationTriangle, path: "/manual-verification" },
+    { name: "Manual Verification", icon: FaExclamationTriangle, path: "/manual-verification" },
   ];
 
   return (
@@ -342,7 +369,7 @@ export default function SKChairmanDashboard() {
                   <ResponsiveContainer width="100%" height={300}>
                     <BarChart data={chartData.programDistribution} layout="vertical">
                       <XAxis type="number" stroke="#888" />
-                      <YAxis type="category" dataKey="name" stroke="#888" width={100} />
+                      <YAxis type="category" dataKey="name" stroke="#888" width={120} />
                       <Tooltip />
                       <Bar dataKey="value" fill="#F59E0B" radius={[0, 8, 8, 0]} />
                     </BarChart>
@@ -373,35 +400,35 @@ export default function SKChairmanDashboard() {
           </div>
 
           {/* Quick Actions */}
-        <div className="quick-actions-section">
-          <h3>Quick Actions</h3>
-          <div className="actions-grid">
-            <button onClick={() => navigate('/manage-youth')} className="action-btn">
-              <img src={icon_manageyouth} alt="Manage Youth" className="action-icon" />
-              <span>Manage Youth</span>
-            </button>
-            
-            <button onClick={() => navigate('/manage-programs')} className="action-btn">
-              <img src={icon_createprogram} alt="Manage Program" className="action-icon" />
-              <span>Manage Program</span>
-            </button>
-            
-            <button onClick={() => navigate('/generate-reports')} className="action-btn">
-              <img src={icon_report} alt="Generate Reports" className="action-icon" />
-              <span>Generate Reports</span>
-            </button>
-            
-            <button onClick={handleOverride} className="action-btn">
-              <img src={icon_overrides} alt="Override" className="action-icon" />
-              <span>Manual Verification</span>
-            </button>
-            
-            <button onClick={() => navigate('/audit-logs')} className="action-btn">
-              <img src={icon_audit} alt="Audit Logs" className="action-icon" />
-              <span>View Audit Logs</span>
-            </button>
+          <div className="quick-actions-section">
+            <h3>Quick Actions</h3>
+            <div className="actions-grid">
+              <button onClick={() => navigate('/manage-youth')} className="action-btn">
+                <img src={icon_manageyouth} alt="Manage Youth" className="action-icon" />
+                <span>Manage Youth</span>
+              </button>
+              
+              <button onClick={() => navigate('/manage-programs')} className="action-btn">
+                <img src={icon_createprogram} alt="Manage Program" className="action-icon" />
+                <span>Manage Program</span>
+              </button>
+              
+              <button onClick={() => navigate('/generate-reports')} className="action-btn">
+                <img src={icon_report} alt="Generate Reports" className="action-icon" />
+                <span>Generate Reports</span>
+              </button>
+              
+              <button onClick={handleOverride} className="action-btn">
+                <img src={icon_overrides} alt="Override" className="action-icon" />
+                <span>Manual Verification</span>
+              </button>
+              
+              <button onClick={() => navigate('/audit-logs')} className="action-btn">
+                <img src={icon_audit} alt="Audit Logs" className="action-icon" />
+                <span>View Audit Logs</span>
+              </button>
+            </div>
           </div>
-        </div>
 
           {/* Recent Data */}
           <div className="bottom-section">
@@ -415,13 +442,16 @@ export default function SKChairmanDashboard() {
                         <span className="info-name">
                           {override.youth?.first_name} {override.youth?.last_name}
                         </span>
-                        <span className="info-program">{override.programs?.program_name}</span>
+                        <span className="info-program">{override.remarks || "No details"}</span>
+                        <span className="info-date">
+                          {format(new Date(override.created_at), "MMM dd, yyyy hh:mm a")}
+                        </span>
                       </div>
-                      <span className="badge urgent">Manual Verification</span>
+                      <span className="badge urgent">Pending</span>
                     </div>
                   ))
                 ) : (
-                  <p className="no-data">No recent Manual Verification</p>
+                  <p className="no-data">No recent manual verifications</p>
                 )}
               </div>
             </div>
