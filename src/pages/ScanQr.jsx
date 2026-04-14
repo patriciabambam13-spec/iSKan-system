@@ -124,21 +124,44 @@ export default function ScanQRPage() {
     }
   };
 
-  // Check duplicate attendance
-  const checkDuplicate = async (userId) => {
+  // ✅ FINAL DUPLICATE CHECK - Checks both attendance and transactions properly
+  const checkDuplicate = async (userId, actionType) => {
     try {
-      const today = new Date().toISOString().split('T')[0];
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+
+      const todayEnd = new Date();
+      todayEnd.setHours(23, 59, 59, 999);
+
+      // Attendance check (for attendance only)
+      if (actionType === "attendance") {
+        const { data, error } = await supabase
+          .from("attendance")
+          .select("id")
+          .eq("youth_id", userId)
+          .gte("created_at", todayStart.toISOString())
+          .lte("created_at", todayEnd.toISOString())
+          .maybeSingle();
+
+        if (error && error.code !== "PGRST116") throw error;
+        return !!data;
+      }
+
+      // Transaction check (for borrow/printing)
       const { data, error } = await supabase
-        .from("attendance")
+        .from("transaction")
         .select("id")
         .eq("youth_id", userId)
-        .gte("created_at", today)
+        .eq("service_type", actionType)
+        .gte("created_at", todayStart.toISOString())
+        .lte("created_at", todayEnd.toISOString())
         .maybeSingle();
 
       if (error && error.code !== "PGRST116") throw error;
       return !!data;
+
     } catch (error) {
-      console.error("Error checking duplicate:", error);
+      console.error("Duplicate check error:", error);
       return false;
     }
   };
@@ -172,14 +195,15 @@ export default function ScanQRPage() {
           service_type: requestType,
           remarks: manualRequestReason,
           transaction_status: "Pending",
-          created_at: new Date().toISOString()
+          created_at: new Date().toISOString(),
+          processed_by: currentUser?.id || null  // ✅ Fixed column name
         }])
         .select()
         .single();
 
       if (tError) throw tError;
 
-      // Optional notification
+      // Send notification to chairman
       try {
         const { data: chairman } = await supabase
           .from("users")
@@ -276,7 +300,7 @@ export default function ScanQRPage() {
           await html5QrCodeRef.current.stop();
           await html5QrCodeRef.current.clear();
           html5QrCodeRef.current = null;
-        } catch  {
+        } catch {
           console.log("Scanner stopped");
         }
       }
@@ -342,12 +366,11 @@ export default function ScanQRPage() {
     reader.readAsDataURL(file);
   };
 
-  // ========== IMPROVED SCANNER WITH BETTER CAMERA SELECTION ==========
+  // Start scanner with camera selection
   const startScanner = async () => {
     if (!isAuthorized || mode !== "scan" || scanning || html5QrCodeRef.current) return;
 
     try {
-      // Get available cameras
       const devices = await Html5Qrcode.getCameras();
       if (!devices || devices.length === 0) {
         setErrorMessage("No camera found on this device");
@@ -355,7 +378,6 @@ export default function ScanQRPage() {
         return;
       }
 
-      // Find back camera (preferred for QR scanning)
       let cameraId = devices[0]?.id;
       const backCamera = devices.find(d => 
         d.label.toLowerCase().includes("back") || 
@@ -371,7 +393,6 @@ export default function ScanQRPage() {
 
       html5QrCodeRef.current = new Html5Qrcode("qr-reader");
       
-      // IMPROVED CONFIG with supported formats
       const config = {
         fps: 15,
         qrbox: { width: 300, height: 300 },
@@ -389,7 +410,6 @@ export default function ScanQRPage() {
           }
         },
         (error) => {
-          // Silent error logging only
           if (error && !error.includes("No MultiFormat Readers")) {
             console.log("Scan error:", error);
           }
@@ -455,43 +475,71 @@ export default function ScanQRPage() {
     setShowConfirmModal(true);
   };
 
-  // Confirm transaction
+  // ✅ FINAL CONFIRM TRANSACTION with all fixes
   const confirmTransaction = async () => {
-    if (!userInfo || !selectedAction) return;
+    // ✅ FIX 2: Lock button to prevent double-click
+    if (!userInfo || !selectedAction || isLoading) return;
 
     setIsLoading(true);
     setErrorMessage("");
 
     try {
-      const isDuplicate = await checkDuplicate(userInfo.id);
+      // ✅ FIX: Use consistent action type for duplicate check
+      const actionKey = selectedAction === "printing" ? "printing" : selectedAction;
+      const isDuplicate = await checkDuplicate(userInfo.id, actionKey);
+      
       if (isDuplicate) {
-        setErrorMessage(`${userInfo.name} already recorded attendance today`);
+        let actionMessage = "";
+        switch(selectedAction) {
+          case "attendance":
+            actionMessage = "attendance already recorded";
+            break;
+          case "borrow":
+            actionMessage = "equipment borrowing already recorded";
+            break;
+          case "printing":
+            actionMessage = "printing transaction already recorded";
+            break;
+          default:
+            actionMessage = "transaction already recorded";
+        }
+        setErrorMessage(`${userInfo.name} has ${actionMessage} today`);
         setIsLoading(false);
         return;
       }
 
       const { data: { user } } = await supabase.auth.getUser();
-      const { data: userData } = await supabase
-        .from("users")
-        .select("first_name, last_name")
-        .eq("user_id", user?.id)
-        .single();
 
-      const verifiedBy = userData ? `${userData.first_name} ${userData.last_name}` : "System";
-
+      // ✅ FIX 1 & 4: Consistent service_type and correct column name
       const { error: insertError } = await supabase
         .from("transaction")
         .insert([{
           youth_id: userInfo.id,
           type: "Service",
-          service_type: selectedAction === "borrow" ? "borrow" : selectedAction === "printing" ? "print" : "attendance",
+          service_type: selectedAction, // ✅ Direct mapping, no conversion
           transaction_status: "Completed",
           remarks: `QR scan - ${selectedAction}`,
           created_at: new Date().toISOString(),
-          verified_by: verifiedBy
+          processed_by: user?.id || null // ✅ Correct column name
         }]);
 
       if (insertError) throw insertError;
+
+      // Record in attendance table if attendance action
+      if (selectedAction === "attendance") {
+        const { error: attendanceError } = await supabase
+          .from("attendance")
+          .insert([{
+            youth_id: userInfo.id,
+            method: "QR Code",
+            created_at: new Date().toISOString(),
+            verified_by: user?.id || null
+          }]);
+
+        if (attendanceError) {
+          console.error("Error recording attendance:", attendanceError);
+        }
+      }
 
       let actionMessage = "";
       switch(selectedAction) {
@@ -511,6 +559,10 @@ export default function ScanQRPage() {
       setSuccessMessage(`${actionMessage} for ${userInfo.name}`);
       setShowSuccess(true);
       
+      // ✅ FIX 3: Hard stop after success - disable further actions
+      setSelectedAction(null);
+      setUserInfo(null);
+      
       await fetchRecentScans();
       
       setTimeout(() => {
@@ -520,8 +572,7 @@ export default function ScanQRPage() {
       
     } catch (error) {
       console.error("Error saving transaction:", error);
-      setErrorMessage("Failed to save transaction");
-    } finally {
+      setErrorMessage("Failed to save transaction: " + (error.message || "Please try again"));
       setIsLoading(false);
       setShowConfirmModal(false);
     }
