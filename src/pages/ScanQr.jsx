@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import { supabase } from "../services/supabaseClient";
-import { Html5Qrcode } from "html5-qrcode";
+import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
 import jsQR from "jsqr";
 import { 
   FaQrcode, FaCheckCircle, FaTimesCircle, FaUser, 
@@ -154,9 +154,8 @@ export default function ScanQRPage() {
     return age;
   };
 
-  // ========== SEND MANUAL REQUEST - FIXED (removed requires_verification) ==========
+  // Send manual request
   const sendManualRequest = async () => {
-    // Validate required fields
     if (!manualRequestReason || !requestType || !selectedYouthId) {
       setErrorMessage("Please complete all fields");
       return;
@@ -165,7 +164,6 @@ export default function ScanQRPage() {
     setIsLoading(true);
 
     try {
-      // ✅ 1. ALWAYS insert transaction (main record - removed requires_verification)
       const { data: newTransaction, error: tError } = await supabase
         .from("transaction")
         .insert([{
@@ -181,7 +179,7 @@ export default function ScanQRPage() {
 
       if (tError) throw tError;
 
-      // ✅ 2. OPTIONAL notification (won't break system if fails)
+      // Optional notification
       try {
         const { data: chairman } = await supabase
           .from("users")
@@ -202,15 +200,11 @@ export default function ScanQRPage() {
             created_at: new Date().toISOString()
           }]);
           console.log("✅ Notification sent to chairman");
-        } else {
-          console.log("⚠️ Chairman not found, notification skipped");
         }
       } catch (notifErr) {
-        // Notification failed but transaction saved - system still works
-        console.log("⚠️ Notification skipped (safe):", notifErr.message);
+        console.log("⚠️ Notification skipped:", notifErr.message);
       }
 
-      // ✅ SUCCESS UI
       setSuccessMessage("Manual verification request submitted!");
       setShowManualRequestModal(false);
       setManualRequestReason("");
@@ -244,7 +238,6 @@ export default function ScanQRPage() {
         return;
       }
       
-      // SAFE QR parsing
       let qrCodeValue = qrData;
       try {
         const parsed = JSON.parse(qrData);
@@ -277,6 +270,7 @@ export default function ScanQRPage() {
         qr_code: youth.qr_code
       });
 
+      // Auto-stop scanner after successful scan
       if (html5QrCodeRef.current) {
         try {
           await html5QrCodeRef.current.stop();
@@ -348,12 +342,12 @@ export default function ScanQRPage() {
     reader.readAsDataURL(file);
   };
 
-  // ========== SCANNER CONTROLS ==========
+  // ========== IMPROVED SCANNER WITH BETTER CAMERA SELECTION ==========
   const startScanner = async () => {
     if (!isAuthorized || mode !== "scan" || scanning || html5QrCodeRef.current) return;
 
     try {
-      // Check if camera is available
+      // Get available cameras
       const devices = await Html5Qrcode.getCameras();
       if (!devices || devices.length === 0) {
         setErrorMessage("No camera found on this device");
@@ -361,17 +355,32 @@ export default function ScanQRPage() {
         return;
       }
 
+      // Find back camera (preferred for QR scanning)
+      let cameraId = devices[0]?.id;
+      const backCamera = devices.find(d => 
+        d.label.toLowerCase().includes("back") || 
+        d.label.toLowerCase().includes("rear")
+      );
+      
+      if (backCamera) {
+        cameraId = backCamera.id;
+        console.log("✅ Using back camera:", backCamera.label);
+      } else {
+        console.log("⚠️ Using default camera:", devices[0]?.label);
+      }
+
       html5QrCodeRef.current = new Html5Qrcode("qr-reader");
       
-      // Improved config for better detection
+      // IMPROVED CONFIG with supported formats
       const config = {
         fps: 15,
         qrbox: { width: 300, height: 300 },
         aspectRatio: 1.0,
+        formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE]
       };
 
       await html5QrCodeRef.current.start(
-        { facingMode: "environment" },
+        { deviceId: cameraId },
         config,
         (decodedText) => {
           console.log("✅ SCANNED:", decodedText);
@@ -380,6 +389,7 @@ export default function ScanQRPage() {
           }
         },
         (error) => {
+          // Silent error logging only
           if (error && !error.includes("No MultiFormat Readers")) {
             console.log("Scan error:", error);
           }
@@ -412,7 +422,7 @@ export default function ScanQRPage() {
     setErrorMessage("");
   };
 
-  // Initialize scanner with delay
+  // Initialize scanner with delay for DOM readiness
   useEffect(() => {
     if (mode === "scan") {
       const timer = setTimeout(() => {

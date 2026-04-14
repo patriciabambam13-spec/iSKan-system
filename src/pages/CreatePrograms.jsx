@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Navbar from "../components/Navbar";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../services/supabaseClient";
@@ -18,6 +18,10 @@ import "../styles/CreateProgram.css";
 export default function CreateProgram() {
 
     const navigate = useNavigate();
+
+    // role state
+    const [roleId, setRoleId] = useState(null);
+    const [loading, setLoading] = useState(true);
 
     const [showModal, setShowModal] = useState(false);
     const [programID, setProgramID] = useState("");
@@ -41,6 +45,46 @@ export default function CreateProgram() {
         cost_per_beneficiary: "",
         estimated_beneficiaries: ""
     });
+
+    // get user role on component mount
+    useEffect(() => {
+        const getUserRole = async () => {
+            const { data: { user } } = await supabase.auth.getUser();
+
+            if (!user) {
+                navigate("/login");
+                setLoading(false);
+                return;
+            }
+
+            const { data, error } = await supabase
+                .from("users")
+                .select("role_id")
+                .eq("user_id", user.id)
+                .single();
+
+            if (!error && data) {
+                setRoleId(data.role_id);
+            }
+            
+            setLoading(false);
+        };
+
+        getUserRole();
+    }, [navigate]);
+
+
+    // loading state
+    if (loading) {
+        return (
+            <>
+                <Navbar />
+                <div style={{ textAlign: "center", padding: "50px" }}>
+                    Loading...
+                </div>
+            </>
+        );
+    }
 
     // program id
     function generateProgramID() {
@@ -400,7 +444,7 @@ export default function CreateProgram() {
                     </div>
                 </form>
 
-                {/* MODAL - USING GLOBAL MODAL SYSTEM */}
+                {/* MODAL - ROLE BASED BUTTONS */}
                 {showModal && (
                     <div className="modal-overlay">
                         <div className="qr-modal">
@@ -415,9 +459,21 @@ export default function CreateProgram() {
                             </div>
 
                             <div className="qr-buttons">
-                                <button className="btn btn-accent" onClick={() => navigate("/manage-programs")}>
-                                    Manage Programs
-                                </button>
+                                {/* Chairman sees Manage Programs */}
+                                {roleId === 1 && (
+                                    <button className="btn btn-accent" onClick={() => navigate("/manage-programs")}>
+                                        Manage Programs
+                                    </button>
+                                )}
+                                
+                                {/* Kagawad sees View Programs */}
+                                {roleId === 2 && (
+                                    <button className="btn btn-accent" onClick={() => navigate("/view-programs")}>
+                                        View Programs
+                                    </button>
+                                )}
+                                
+                                {/* Both roles see Create Another button */}
                                 <button className="btn btn-primary" onClick={() => window.location.reload()}>
                                     Create Another
                                 </button>
