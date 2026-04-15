@@ -22,13 +22,24 @@ export default function Navbar() {
   // Fetch notifications and setup real-time listener
   useEffect(() => {
     const fetchNotifications = async () => {
-      const { data } = await supabase
+      const userId = localStorage.getItem("userId");
+      
+      if (!userId) {
+        console.log("No userId found");
+        return;
+      }
+
+      const { data, error } = await supabase
         .from("notifications")
         .select("*")
-        .eq("role_target", role)
+        .eq("receiver_id", userId) // ✅ Changed from role_target to receiver_id
         .order("created_at", { ascending: false });
 
-      setNotifications(data || []);
+      if (error) {
+        console.error("Error fetching notifications:", error);
+      } else {
+        setNotifications(data || []);
+      }
     };
 
     fetchNotifications();
@@ -44,7 +55,10 @@ export default function Navbar() {
           table: "notifications",
         },
         (payload) => {
-          if (payload.new.role_target === role) {
+          const userId = localStorage.getItem("userId");
+          
+          // ✅ Check if notification is for current user
+          if (payload.new.receiver_id === userId) {
             setNotifications((prev) => [payload.new, ...prev]);
           }
         }
@@ -54,7 +68,7 @@ export default function Navbar() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [role]);
+  }, []); // ✅ Removed role dependency, now using userId
 
   function logout() {
     localStorage.removeItem("userRole");
@@ -71,7 +85,7 @@ export default function Navbar() {
     setIsNotificationOpen(!isNotificationOpen);
   };
 
-  const unreadCount = notifications.length;
+  const unreadCount = notifications.filter(n => !n.is_read).length; // ✅ Only count unread
 
   if (!role) {
     return null;
@@ -89,12 +103,6 @@ export default function Navbar() {
               {role === 1 ? "SK Chairman Dashboard" : "SK Kagawad Dashboard"}
             </span>
           </div>
-        </div>
-
-        {/* CENTER SEARCH */}
-        <div className="navbar-search">
-          <FaSearch className="navbar-search-icon" />
-          <input type="text" placeholder="Search Youth by Name" />
         </div>
 
         {/* RIGHT SIDE */}
